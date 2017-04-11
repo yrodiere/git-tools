@@ -1,0 +1,31 @@
+#!/bin/bash -e
+
+function log() {
+	echo 1>&2 "${@}"
+}
+
+function abort() {
+	log "${@}"
+	log 'Aborting.'
+	exit 1
+}
+
+function success() {
+	log "${@}"
+	exit 0
+}
+
+SOURCE="$1"
+TARGET="$2"
+
+[ -n "$SOURCE" -a -n "$TARGET" ] || abort 'Syntax: git remote-sync <source-remote> <target-remote>'
+
+git fetch --multiple -q -p "$SOURCE" "$TARGET"
+
+PUSHED_REFS=$(git for-each-ref "refs/remotes/$SOURCE/" --format '%(refname):refs/heads/%(refname:strip=3)' | grep -v ':refs/heads/HEAD$')
+git push --dry-run "$TARGET" $PUSHED_REFS
+
+read -p 'OK with that? [y/N] '
+[ "$REPLY" = 'y' ] || abort
+
+git push "$TARGET" $PUSHED_REFS

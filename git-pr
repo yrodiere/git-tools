@@ -1,0 +1,56 @@
+#!/bin/bash -e
+
+function log() {
+	echo 1>&2 "${@}"
+}
+
+function abort() {
+	log "${@}"
+	log 'Aborting.'
+	exit 1
+}
+
+function success() {
+	log "${@}"
+	exit 0
+}
+
+function checkout_existing() {
+	git checkout "$LOCAL_BRANCH_NAME" \
+		&& success "Checked out the pre-existing local branch '$LOCAL_BRANCH_NAME'." \
+		|| abort "Error while checking out the pre-existing local branch '$LOCAL_BRANCH_NAME'."
+}
+
+function fetch_remote() {
+	local REMOTE_NAME="$1"
+	local REMOTE_URL="$2"
+	git remote get-url "$REMOTE_NAME" 2>/dev/null | grep "^$REMOTE_URL\$" \
+		|| git remote add "$REMOTE_NAME" "$REMOTE_URL"
+	git fetch -p "$REMOTE_NAME"
+}
+
+function checkout_missing() {
+	local REMOTE_URL="https://github.com/$REMOTE_USER_NAME/$REPOSITORY_NAME.git"
+	local REMOTE_NAME="contrib-$REMOTE_USER_NAME"
+	fetch_remote "$REMOTE_NAME" "$REMOTE_URL"
+	git checkout -b "$LOCAL_BRANCH_NAME" "$REMOTE_NAME"/"$REMOTE_BRANCH_NAME"
+}
+
+if [ "$1" = 'setup' ]
+then
+	git config --local 'pr.repository.name' "$2"
+	exit 0
+fi
+
+REPOSITORY_NAME=$(git config --local 'pr.repository.name')
+
+[ -n "$REPOSITORY_NAME" ] || abort "Use 'git pr setup <repository-name>' to set the repository name first."
+
+REMOTE_USER_NAME=$(echo "$1" | awk -F ':' '{ print $1 }')
+REMOTE_BRANCH_NAME=$(echo "$1" | awk -F ':' '{ print $2 }')
+
+[ -n "$REMOTE_USER_NAME" -a -n "$REMOTE_BRANCH_NAME" ] || abort 'Syntax: git pr <user>:<branch>'
+
+LOCAL_BRANCH_NAME="$REMOTE_USER_NAME-$REMOTE_BRANCH_NAME"
+
+git rev-parse --quiet --verify "$LOCAL_BRANCH_NAME" && checkout_existing || checkout_missing

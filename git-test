@@ -1,0 +1,34 @@
+#!/bin/bash -e
+
+function log() {
+	echo 1>&2 "${@}"
+}
+
+function abort() {
+	log "${@}"
+	log 'Aborting.'
+	exit 1
+}
+
+function success() {
+	log "${@}"
+	exit 0
+}
+
+if [ "$1" = 'setup' ]
+then
+	git config --local 'ci.test.remote' "$2"
+	success "Successfully set the remote to push to for tests to '$2'."
+fi
+
+REMOTE=$(git config --local 'ci.test.remote')
+
+[ -n "$REMOTE" ] || abort "Use 'git test setup <remote>' to set the remote to push to first."
+
+COMMIT=$(git rev-parse ${1:-HEAD})
+
+BRANCH=$(git config 'ci.test.branch')
+[ -n "$BRANCH" ] || abort 'Internal error: the test branch has not been set up.'
+
+git update-ref "refs/heads/$BRANCH" "$COMMIT"
+git push --force "$REMOTE" "$BRANCH":"$BRANCH"

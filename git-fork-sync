@@ -1,0 +1,31 @@
+#!/bin/bash -e
+
+function log() {
+	echo 1>&2 "${@}"
+}
+
+function abort() {
+	log "${@}"
+	log 'Aborting.'
+	exit 1
+}
+
+function success() {
+	log "${@}"
+	exit 0
+}
+
+
+if [ "$1" = 'setup' ]
+then
+	git config --local sync.fork.upstream.remote "$2"
+	git config --local sync.fork.remote "$3"
+	success "Successfully set the upstream remote ('$2') and the fork remote ('$3')."
+fi
+
+SOURCE_REMOTE=$(git config --local sync.fork.upstream.remote)
+TARGET_REMOTE=$(git config --local sync.fork.remote)
+
+[ -n "$SOURCE_REMOTE" -a -n "$TARGET_REMOTE" ] || abort "Use 'git fork-sync-setup <upstream-remote> <fork-remote>' to set the remote to push to first."
+
+git remote-sync "$SOURCE_REMOTE" "$TARGET_REMOTE"
