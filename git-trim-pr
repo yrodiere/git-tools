@@ -1,0 +1,25 @@
+#!/bin/bash -e
+# Delete branches tracking a contrib-* remote
+
+function log() {
+	echo 1>&2 "${@}"
+}
+
+function abort() {
+	log "${@}"
+	log 'Aborting.'
+	exit 1
+}
+
+function success() {
+	log "${@}"
+	exit 0
+}
+
+for LINE in $(git for-each-ref --format="%(refname:short):%(upstream:short)" refs/heads/ | grep -E ':contrib-[^/]+/.+$')
+do
+	LOCAL_BRANCH=$(echo "$LINE" | cut -d':' -f 1)
+	UPSTREAM_BRANCH=$(echo "$LINE" | cut -d':' -f 2)
+	echo "Branch '$LOCAL_BRANCH' is tracking the remote branch '$UPSTREAM_BRANCH', which is on a contributor's remote. Deleting."
+	git branch -D "$LOCAL_BRANCH"
+done

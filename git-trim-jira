@@ -1,0 +1,81 @@
+#!/bin/bash -e
+# Delete branches named after a JIRA ticket based on the status of this ticket
+
+function log() {
+	echo 1>&2 "${@}"
+}
+
+function abort() {
+	log "${@}"
+	log 'Aborting.'
+	exit 1
+}
+
+function success() {
+	log "${@}"
+	exit 0
+}
+
+RESOLUTION_NOT_FOUND="<NOT FOUND>"
+RESOLUTION_UNREADABLE="<COULD NOT READ>"
+
+function get_resolution() {
+	local TICKET_KEY="$1"
+	curl -s -X GET -H "Content-Type: application/json" "$ENDPOINT/rest/api/2/issue/$TICKET_KEY" \
+		| { jq -r '.fields.resolution.name' || echo "$RESOLUTION_UNREADABLE" ; } \
+		|| echo "$RESOLUTION_NOT_FOUND"
+}
+
+function is_fixed() {
+	local RESOLUTION="$1"
+	case $RESOLUTION in
+	Fixed)
+		true
+		;;
+	*)
+		false
+		;;
+	esac
+}
+
+function delete_branch() {
+	local BRANCH_NAME="$1"
+	local UPSTREAM=$(git for-each-ref --format='%(upstream:short)' "refs/heads/$BRANCH_NAME")
+	if [[ "$UPSTREAM" =~ ^"$TRIM_REMOTE/" ]]
+	then
+		local UPSTREAM_BRANCH=$(echo "$UPSTREAM" | cut -d'/' -f 2)
+		git push --delete "$TRIM_REMOTE" "$UPSTREAM_BRANCH" \
+			|| log "Deleting '$UPSTREAM_BRANCH' on '$TRIM_REMOTE' failed, probably because the branch no longer exists. Ignoring."
+	fi
+	git branch -D "$BRANCH_NAME"
+}
+
+if [ "$1" = 'setup' ]
+then
+	git config --local 'jira.endpoint' "$2"
+	git config --local 'jira.project.key' "$3"
+	git config --local 'trim.jira.remote' "$4"
+	success "Successfully set the JIRA endpoint ('$2'), project key ('$3'), and remote for trimming ('$4')."
+fi
+
+#which jq || abort "You must install the JSON parsing utility 'jq' first."
+
+ENDPOINT=$(git config --local 'jira.endpoint')
+PROJECT_KEY=$(git config --local 'jira.project.key')
+TRIM_REMOTE=$(git config --local 'trim.jira.remote')
+
+[ -n "$ENDPOINT" -a -n "$PROJECT_KEY" -a -n "$TRIM_REMOTE" ] || abort "Use 'git trim-jira setup <JIRA endpoint> <JIRA project key> <Git remote for trimming>' to set the trimming parameters first."
+
+for BRANCH_NAME in $(git for-each-ref --format='%(refname:short)' refs/heads/ | grep -E "^$PROJECT_KEY-[[:digit:]]+$")
+do
+	TICKET_KEY="$BRANCH_NAME"
+	RESOLUTION=$(get_resolution "$TICKET_KEY")
+	echo -n "Branch '$BRANCH_NAME' refers to ticket '$ENDPOINT/browse/$TICKET_KEY' with resolution '$RESOLUTION'. "
+	if is_fixed "$RESOLUTION"
+	then
+		echo "Deleting."
+		delete_branch "$BRANCH_NAME"
+	else
+		echo "Skipping."
+	fi
+done
