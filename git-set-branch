@@ -1,0 +1,24 @@
+#!/bin/bash -e
+
+function log() {
+	echo 1>&2 "${@}"
+}
+
+function abort() {
+	log "${@}"
+	log 'Aborting.'
+	exit 1
+}
+
+function success() {
+	log "${@}"
+	exit 0
+}
+
+BRANCH="${1}"
+NEW="${2}"
+CURRENT=$(git rev-parse "$BRANCH")
+
+git update-ref "refs/heads/$BRANCH" "$NEW" "$CURRENT"
+
+success "Successfully reset branch '$BRANCH' to '$NEW'."

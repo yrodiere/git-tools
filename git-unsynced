@@ -1,0 +1,20 @@
+#!/bin/bash -e
+# List branches that are not synchronized with their remote tracking branch
+
+function log() {
+	echo 1>&2 "${@}"
+}
+
+function abort() {
+	log "${@}"
+	log 'Aborting.'
+	exit 1
+}
+
+function success() {
+	log "${@}"
+	exit 0
+}
+
+git for-each-ref --format='%(refname:short) %(push:short) %(push:track)' refs/heads | sed -r 's/^(\S+)  $/\1  [no upstream]/' | grep --color=no -E '^\S+ \S* \[' \
+	|| log "No unsynchronized branch."
