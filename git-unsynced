@@ -16,5 +16,7 @@ function success() {
 	exit 0
 }
 
+git fetch --all --prune
+
 git for-each-ref --format='%(refname:short) %(push:short) %(push:track)' refs/heads | sed -r 's/^(\S+)  $/\1  [no upstream]/' | grep --color=no -E '^\S+ \S* \[' \
 	|| log "No unsynchronized branch."
