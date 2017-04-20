@@ -38,7 +38,8 @@ function checkout_missing() {
 
 if [ "$1" = 'setup' ]
 then
-	git config --local 'pr.repository.name' "$2"
+	shift
+	git config --local 'pr.repository.name' "$1"
 	exit 0
 fi
 

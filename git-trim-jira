@@ -52,10 +52,11 @@ function delete_branch() {
 
 if [ "$1" = 'setup' ]
 then
-	git config --local 'jira.endpoint' "$2"
-	git config --local 'jira.project.key' "$3"
-	git config --local 'trim.jira.remote' "$4"
-	success "Successfully set the JIRA endpoint ('$2'), project key ('$3'), and remote for trimming ('$4')."
+	shift
+	git config --local 'jira.endpoint' "$1"
+	git config --local 'jira.project.key' "$2"
+	git config --local 'trim.jira.remote' "$3"
+	success "Successfully set the JIRA endpoint ('$1'), project key ('$2'), and remote for trimming ('$3')."
 fi
 
 #which jq || abort "You must install the JSON parsing utility 'jq' first."

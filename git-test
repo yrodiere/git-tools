@@ -17,8 +17,9 @@ function success() {
 
 if [ "$1" = 'setup' ]
 then
-	git config --local 'ci.test.remote' "$2"
-	success "Successfully set the remote to push to for tests to '$2'."
+	shift
+	git config --local 'ci.test.remote' "$1"
+	success "Successfully set the remote to push to for tests to '$1'."
 fi
 
 REMOTE=$(git config --local 'ci.test.remote')
