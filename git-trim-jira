@@ -27,6 +27,22 @@ function delete_branch() {
 	git branch -D "$BRANCH_NAME"
 }
 
+function trim_if_necessary() {
+	while read BRANCH_NAME TICKET_KEY TARGET_BRANCH
+	do
+		TICKET_URL=$(git jira url "$TICKET_KEY")
+		RESOLUTION=$(git jira resolution "$TICKET_KEY" 2>/dev/null || true)
+		echo -n "Branch '$BRANCH_NAME' refers to ticket '$TICKET_URL' with resolution '$RESOLUTION'. "
+		if is_fixed "$RESOLUTION"
+		then
+			echo "Deleting."
+			delete_branch "$BRANCH_NAME"
+		else
+			echo "Skipping."
+		fi
+	done
+}
+
 if [ "$1" = 'setup' ]
 then
 	shift
@@ -39,17 +55,5 @@ TRIM_REMOTE=$(git config --local 'trim.jira.remote')
 
 [ -n "$TRIM_REMOTE" ] || abort "Use 'git trim-jira setup <Git remote for trimming>' to set the trimming parameters first."
 
-for BRANCH_NAME in $(git for-each-ref --format='%(refname:short)' refs/heads/ | git jira extract-ticket-keys)
-do
-	TICKET_KEY="$BRANCH_NAME"
-	TICKET_URL=$(git jira url "$TICKET_KEY")
-	RESOLUTION=$(git jira resolution "$TICKET_KEY" 2>/dev/null || true)
-	echo -n "Branch '$BRANCH_NAME' refers to ticket '$TICKET_URL' with resolution '$RESOLUTION'. "
-	if is_fixed "$RESOLUTION"
-	then
-		echo "Deleting."
-		delete_branch "$BRANCH_NAME"
-	else
-		echo "Skipping."
-	fi
-done
+git for-each-ref --format='%(refname:short)' refs/heads/ | git jira translate-branch-name | trim_if_necessary
+

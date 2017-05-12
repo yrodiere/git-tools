@@ -13,7 +13,7 @@ function usage() {
 	log -e "OR"
 	log -e "\tgit jira summary <JIRA ticket key>"
 	log -e "OR"
-	log -e "\tgit jira extract-ticket-keys"
+	log -e "\tgit jira translate-branch-name"
 	abort
 }
 
@@ -59,11 +59,12 @@ then
 	(( $# == 1 )) || usage
 	TICKET_KEY="$1"
 	query_ticket "$TICKET_KEY" | extract_field '.fields.summary'
-elif [ "$1" = 'extract-ticket-keys' ]
+elif [ "$1" = 'translate-branch-name' ]
 then
 	shift
 	(( $# == 0 )) || usage
-	grep -E "^$PROJECT_KEY-[[:digit:]]+$"
+	# Output: <input><tab><ticket name><tab><base branch (if any)>
+	sed -r 's/^('"$PROJECT_KEY"'-[[:digit:]]+)(-([.[:digit:]]+))?$/\0\t\1\t\3/;t;d;'
 else
 	usage
 fi
