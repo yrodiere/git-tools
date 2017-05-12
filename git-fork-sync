@@ -18,15 +18,11 @@ function success() {
 
 if [ "$1" = 'setup' ]
 then
-	shift
-	git config --local sync.fork.upstream.remote "$1"
-	git config --local sync.fork.remote "$2"
-	success "Successfully set the upstream remote ('$1') and the fork remote ('$2')."
+	log "This syntax is deprecated; use 'git fork setup' instead."
+	git fork "${@}"
 fi
 
-SOURCE_REMOTE=$(git config --local sync.fork.upstream.remote)
-TARGET_REMOTE=$(git config --local sync.fork.remote)
-
-[ -n "$SOURCE_REMOTE" -a -n "$TARGET_REMOTE" ] || abort "Use 'git fork-sync setup <upstream-remote> <fork-remote>' to set the remote to push to first."
+SOURCE_REMOTE=$(git fork upstream.remote)
+TARGET_REMOTE=$(git fork remote)
 
 git remote-sync "$SOURCE_REMOTE" "$TARGET_REMOTE"

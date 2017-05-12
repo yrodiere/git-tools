@@ -1,4 +1,7 @@
 #!/bin/bash -e
+# Checkout and create PRs on GitHub
+
+set -o pipefail
 
 function log() {
 	echo 1>&2 "${@}"
@@ -13,6 +16,18 @@ function abort() {
 function success() {
 	log "${@}"
 	exit 0
+}
+
+function usage() {
+	log 'Usage:'
+       	log -e '\tgit pr <user>:<branch>'
+       	log -e 'OR'
+       	log -e '\tgit pr create'
+       	log -e 'OR'
+       	log -e '\tgit pr create <branch>'
+       	log -e 'OR'
+       	log -e '\tgit pr create <branch> <jira ticket>'
+	abort
 }
 
 function checkout_existing() {
@@ -36,22 +51,64 @@ function checkout_missing() {
 	git checkout -b "$LOCAL_BRANCH_NAME" "$REMOTE_NAME"/"$REMOTE_BRANCH_NAME"
 }
 
+function urlencode() {
+	which jq 1>/dev/null || abort "You must install the JSON parsing utility 'jq' first."
+	jq -s -R -r @uri
+}
+
+function create_pr() {
+	local FORK_BRANCH="$1"
+	local JIRA_TICKET_KEY="$2"
+
+	local UPSTREAM_URL="$(git fork upstream.url.http)"
+	local UPSTREAM_HEAD_BRANCH="$(git fork upstream.branch.head.relative)"
+	local FORK_USERNAME="$(git fork user.name)"
+
+	local TITLE=$(echo "$JIRA_TICKET_KEY $(git jira summary $JIRA_TICKET_KEY)" | urlencode)
+	local BODY=$(git jira url $JIRA_TICKET_KEY | urlencode)
+
+	xdg-open "$UPSTREAM_URL/compare/$UPSTREAM_HEAD_BRANCH...$FORK_USERNAME:$FORK_BRANCH?expand=1&title=$TITLE&body=$BODY"
+}
+
 if [ "$1" = 'setup' ]
 then
 	shift
 	git config --local 'pr.repository.name' "$1"
-	exit 0
+	success "Successfully set target repository for pull requests to '$1'."
 fi
 
 REPOSITORY_NAME=$(git config --local 'pr.repository.name')
 
 [ -n "$REPOSITORY_NAME" ] || abort "Use 'git pr setup <repository-name>' to set the repository name first."
 
-REMOTE_USER_NAME=$(echo "$1" | awk -F ':' '{ print $1 }')
-REMOTE_BRANCH_NAME=$(echo "$1" | awk -F ':' '{ print $2 }')
+if [ "$1" == 'create' ]
+then
+	shift
+	if (( $# == 0 ))
+	then
+		FORK_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+		JIRA_TICKET_KEY="$FORK_BRANCH"
+	elif (( $# == 1 ))
+	then
+		FORK_BRANCH=$(git rev-parse --abref-ref "$1")
+		JIRA_TICKET_KEY="$FORK_BRANCH"
+	elif (( $# == 2 ))
+	then
+		FORK_BRANCH=$(git rev-parse --abref-ref "$1")
+		JIRA_TICKET_KEY=$2
+	else
+		usage
+	fi
+	create_pr "$FORK_BRANCH" "$JIRA_TICKET_KEY"
+else 
+	(( $# == 1 )) || usage
 
-[ -n "$REMOTE_USER_NAME" -a -n "$REMOTE_BRANCH_NAME" ] || abort 'Syntax: git pr <user>:<branch>'
+	REMOTE_USER_NAME=$(echo "$1" | awk -F ':' '{ print $1 }')
+	REMOTE_BRANCH_NAME=$(echo "$1" | awk -F ':' '{ print $2 }')
 
-LOCAL_BRANCH_NAME="$REMOTE_USER_NAME-$REMOTE_BRANCH_NAME"
+	[ -n "$REMOTE_USER_NAME" -a -n "$REMOTE_BRANCH_NAME" ] || usage
 
-git rev-parse --quiet --verify "$LOCAL_BRANCH_NAME" && checkout_existing || checkout_missing
+	LOCAL_BRANCH_NAME="$REMOTE_USER_NAME-$REMOTE_BRANCH_NAME"
+
+	git rev-parse --quiet --verify "$LOCAL_BRANCH_NAME" && checkout_existing || checkout_missing
+fi

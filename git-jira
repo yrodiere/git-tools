@@ -1,0 +1,85 @@
+#!/bin/bash -e
+# Various utilities to get information from JIRA
+
+set -o pipefail # For curl failures
+
+function log() {
+	echo 1>&2 "${@}"
+}
+
+function abort() {
+	log "${@}"
+	log 'Aborting.'
+	exit 1
+}
+
+function success() {
+	log "${@}"
+	exit 0
+}
+
+function usage() {
+	log "Usage:"
+	log -e "\tgit jira setup <JIRA endpoint> <JIRA project key>"
+	log -e "OR"
+	log -e "\tgit jira url <JIRA ticket key>"
+	log -e "OR"
+	log -e "\tgit jira resolution <JIRA ticket key>"
+	log -e "OR"
+	log -e "\tgit jira summary <JIRA ticket key>"
+	log -e "OR"
+	log -e "\tgit jira extract-ticket-keys"
+	abort
+}
+
+function query_ticket() {
+	local TICKET_KEY="$1"
+	local URL="$ENDPOINT/rest/api/2/issue/$TICKET_KEY"
+	curl -s -X GET -L -f -H "Content-Type: application/json" "$URL" \
+		|| abort "Failed to retrieve ticket '$TICKET_KEY' from '$URL'"
+}
+
+function extract_field() {
+	which jq 1>/dev/null || abort "You must install the JSON parsing utility 'jq' first."
+	jq -er "$1" || abort "Failed to extract field '$1' from the JIRA ticket."
+}
+
+if [ "$1" = 'setup' ]
+then
+	shift
+	git config --local 'jira.endpoint' "$1"
+	git config --local 'jira.project.key' "$2"
+	success "Successfully set the JIRA endpoint ('$1') and project key ('$2')."
+fi
+
+ENDPOINT=$(git config --local 'jira.endpoint')
+PROJECT_KEY=$(git config --local 'jira.project.key')
+[ -n "$ENDPOINT" -a -n "$PROJECT_KEY" ] || abort "Use 'git jira setup <JIRA endpoint> <JIRA project key>' to set the JIRA parameters first."
+
+if [ "$1" = 'url' ]
+then
+	shift
+	(( $# == 1 )) || usage
+	TICKET_KEY="$1"
+	echo "$ENDPOINT/browse/$TICKET_KEY"
+elif [ "$1" = 'resolution' ]
+then
+	shift
+	(( $# == 1 )) || usage
+	TICKET_KEY="$1"
+	query_ticket "$TICKET_KEY" | extract_field '.fields.resolution.name'
+elif [ "$1" = 'summary' ]
+then
+	shift
+	(( $# == 1 )) || usage
+	TICKET_KEY="$1"
+	query_ticket "$TICKET_KEY" | extract_field '.fields.summary'
+elif [ "$1" = 'extract-ticket-keys' ]
+then
+	shift
+	(( $# == 0 )) || usage
+	grep -E "^$PROJECT_KEY-[[:digit:]]+$"
+else
+	usage
+fi
+

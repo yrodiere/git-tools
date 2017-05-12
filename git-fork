@@ -1,0 +1,101 @@
+#!/bin/bash -e
+# Various utilities around GitHub forks
+
+set -o pipefail
+
+function log() {
+	echo 1>&2 "${@}"
+}
+
+function abort() {
+	log "${@}"
+	log 'Aborting.'
+	exit 1
+}
+
+function success() {
+	log "${@}"
+	exit 0
+}
+
+function usage() {
+	log "Usage:"
+	log -e "\tgit fork setup <upstream-remote> <fork-remote>"
+	log -e "OR"
+	log -e "\tgit fork upstream.remote"
+	log -e "OR"
+	log -e "\tgit fork upstream.url.http"
+	log -e "OR"
+	log -e "\tgit fork upstream.branch.head.relative"
+	log -e "OR"
+	log -e "\tgit fork remote"
+	log -e "OR"
+	log -e "\tgit fork shortref"
+	abort
+}
+
+function config_get() {
+	git config --local "$1"
+}
+
+function config_set() {
+	git config --local "$1" "$2"
+}
+
+function config_unset() {
+	git config --local --unset "$1"
+}
+
+function convert_legacy() {
+	LEGACY_VALUE=$(config_get "$1") \
+		&& log "Moving legacy configuration option '$1' to '$2'..." \
+		&& config_set "$2" "$LEGACY_VALUE" \
+		&& config_unset "$1" \
+		&& echo "$LEGACY_VALUE"
+}
+
+if [ "$1" = 'setup' ]
+then
+	shift
+	(( $# == 2 )) || usage
+	git config --local sync.fork.upstream.remote "$1"
+	git config --local sync.fork.remote "$2"
+	success "Successfully set the upstream remote ('$1') and the fork remote ('$2')."
+fi
+
+UPSTREAM_REMOTE=$(git config --local fork.upstream.remote \
+	|| convert_legacy sync.fork.upstream.remote fork.upstream.remote) \
+	|| abort "Use 'git fork setup <upstream-remote> <fork-remote>' first."
+FORK_REMOTE=$(git config --local fork.remote \
+	|| convert_legacy sync.fork.remote fork.remote) \
+	|| abort "Use 'git fork setup <upstream-remote> <fork-remote>' first."
+
+if [ "$1" = 'upstream.remote' ]
+then
+	shift
+	(( $# == 0 )) || usage
+	echo "$UPSTREAM_REMOTE"
+elif [ "$1" = 'upstream.url.http' ]
+then
+	shift
+	(( $# == 0 )) || usage
+	git remote get-url "$UPSTREAM_REMOTE" | sed -s 's,^git@github.com:,https://github.com/,;s,\.git$,/,;'
+elif [ "$1" = 'upstream.branch.head.relative' ]
+then
+	shift
+	(( $# == 0 )) || usage
+	git rev-parse --abbrev-ref "$UPSTREAM_REMOTE/HEAD" | sed -s "s,^$UPSTREAM_REMOTE/,,"
+elif [ "$1" = 'remote' ]
+then
+	shift
+	(( $# == 0 )) || usage
+	echo "$FORK_REMOTE"
+elif [ "$1" = 'user.name' ]
+then
+	shift
+	(( $# == 0 )) || usage
+	git remote get-url "$FORK_REMOTE" | sed -r 's,^git@github.com:([^/]+)/.*\.git$,\1,;s,^https://github.com/([^/]+)/.*$,\1,'
+else
+	usage
+fi
+
