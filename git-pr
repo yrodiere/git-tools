@@ -70,11 +70,11 @@ then
 		JIRA_TICKET_KEY="$FORK_BRANCH"
 	elif (( $# == 1 ))
 	then
-		FORK_BRANCH=$(git rev-parse --abref-ref "$1")
+		FORK_BRANCH=$(git rev-parse --abbrev-ref "$1")
 		JIRA_TICKET_KEY="$FORK_BRANCH"
 	elif (( $# == 2 ))
 	then
-		FORK_BRANCH=$(git rev-parse --abref-ref "$1")
+		FORK_BRANCH=$(git rev-parse --abbrev-ref "$1")
 		JIRA_TICKET_KEY=$2
 	else
 		usage
