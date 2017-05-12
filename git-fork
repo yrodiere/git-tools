@@ -34,23 +34,11 @@ function usage() {
 	abort
 }
 
-function config_get() {
-	git config --local "$1"
-}
-
-function config_set() {
-	git config --local "$1" "$2"
-}
-
-function config_unset() {
-	git config --local --unset "$1"
-}
-
 function convert_legacy() {
-	LEGACY_VALUE=$(config_get "$1") \
+	LEGACY_VALUE=$(git config --local "$1") \
 		&& log "Moving legacy configuration option '$1' to '$2'..." \
-		&& config_set "$2" "$LEGACY_VALUE" \
-		&& config_unset "$1" \
+		&& git config --local "$2" "$LEGACY_VALUE" \
+		&& git config --local --unset "$1" \
 		&& echo "$LEGACY_VALUE"
 }
 
