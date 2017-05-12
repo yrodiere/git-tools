@@ -12,6 +12,8 @@ function usage() {
        	log -e '\tgit pr create <branch>'
        	log -e 'OR'
        	log -e '\tgit pr create <branch> <jira ticket>'
+       	log -e 'OR'
+       	log -e '\tgit pr create <branch> <jira ticket> <upstream branch>'
 	abort
 }
 

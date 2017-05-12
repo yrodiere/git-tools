@@ -15,7 +15,7 @@ function usage() {
 	log -e "OR"
 	log -e "\tgit fork remote"
 	log -e "OR"
-	log -e "\tgit fork shortref"
+	log -e "\tgit fork user.name"
 	abort
 }
 
