@@ -16,15 +16,7 @@ function success() {
 	exit 0
 }
 
-RESOLUTION_NOT_FOUND="<NOT FOUND>"
-RESOLUTION_UNREADABLE="<COULD NOT READ>"
-
-function get_resolution() {
-	local TICKET_KEY="$1"
-	curl -s -X GET -H "Content-Type: application/json" "$ENDPOINT/rest/api/2/issue/$TICKET_KEY" \
-		| { jq -r '.fields.resolution.name' || echo "$RESOLUTION_UNREADABLE" ; } \
-		|| echo "$RESOLUTION_NOT_FOUND"
-}
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
 
 function is_fixed() {
 	local RESOLUTION="$1"
