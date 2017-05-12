@@ -1,19 +1,6 @@
-#!/bin/bash -e
+#!/bin/bash
 
-function log() {
-	echo 1>&2 "${@}"
-}
-
-function abort() {
-	log "${@}"
-	log 'Aborting.'
-	exit 1
-}
-
-function success() {
-	log "${@}"
-	exit 0
-}
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
 
 SOURCE="$1"
 TARGET="$2"

@@ -1,20 +1,7 @@
-#!/bin/bash -e
+#!/bin/bash
 # Delete branches tracking a contrib-* remote
 
-function log() {
-	echo 1>&2 "${@}"
-}
-
-function abort() {
-	log "${@}"
-	log 'Aborting.'
-	exit 1
-}
-
-function success() {
-	log "${@}"
-	exit 0
-}
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
 
 for LINE in $(git for-each-ref --format="%(refname:short):%(upstream:short)" refs/heads/ | grep -E ':contrib-[^/]+/.+$')
 do

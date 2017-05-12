@@ -1,22 +1,7 @@
-#!/bin/bash -e
+#!/bin/bash
 # Checkout and create PRs on GitHub
 
-set -o pipefail
-
-function log() {
-	echo 1>&2 "${@}"
-}
-
-function abort() {
-	log "${@}"
-	log 'Aborting.'
-	exit 1
-}
-
-function success() {
-	log "${@}"
-	exit 0
-}
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
 
 function usage() {
 	log 'Usage:'
@@ -49,11 +34,6 @@ function checkout_missing() {
 	local REMOTE_NAME="contrib-$REMOTE_USER_NAME"
 	fetch_remote "$REMOTE_NAME" "$REMOTE_URL"
 	git checkout -b "$LOCAL_BRANCH_NAME" "$REMOTE_NAME"/"$REMOTE_BRANCH_NAME"
-}
-
-function urlencode() {
-	which jq 1>/dev/null || abort "You must install the JSON parsing utility 'jq' first."
-	jq -s -R -r @uri
 }
 
 function create_pr() {
