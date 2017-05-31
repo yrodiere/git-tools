@@ -31,8 +31,8 @@ if [ "$1" = 'setup' ]
 then
 	shift
 	(( $# == 2 )) || usage
-	git config --local sync.fork.upstream.remote "$1"
-	git config --local sync.fork.remote "$2"
+	git config --local fork.upstream.remote "$1"
+	git config --local fork.remote "$2"
 	success "Successfully set the upstream remote ('$1') and the fork remote ('$2')."
 fi
 
