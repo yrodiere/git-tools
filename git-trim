@@ -1,0 +1,89 @@
+#!/bin/bash
+# Delete unnecessary local branches:
+# * those named after a JIRA ticket based on the status of this ticket
+# * those tracking a contrib-* remote
+
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
+
+function usage() {
+        log 'Usage:'
+        log -e '\tgit trim setup <Git remote for JIRA trimming>'
+        log -e 'OR'
+        log -e '\tgit trim jira'
+        log -e 'OR'
+        log -e '\tgit trim pr'
+        abort
+}
+
+function is_fixed() {
+	local RESOLUTION="$1"
+	case $RESOLUTION in
+	Fixed)
+		true
+		;;
+	*)
+		false
+		;;
+	esac
+}
+
+function delete_local_and_remote_branch() {
+	local BRANCH_NAME="$1"
+	local UPSTREAM=$(git for-each-ref --format='%(upstream:short)' "refs/heads/$BRANCH_NAME")
+	if [[ "$UPSTREAM" =~ ^"$TRIM_REMOTE/" ]]
+	then
+		local UPSTREAM_BRANCH=$(echo "$UPSTREAM" | cut -d'/' -f 2)
+		git push --delete "$TRIM_REMOTE" "$UPSTREAM_BRANCH" \
+			|| log "Deleting '$UPSTREAM_BRANCH' on '$TRIM_REMOTE' failed, probably because the branch no longer exists. Ignoring."
+	fi
+	git branch -D "$BRANCH_NAME"
+}
+
+function trim_jira_if_necessary() {
+	while read BRANCH_NAME TICKET_KEY TARGET_BRANCH
+	do
+		TICKET_URL=$(git jira url "$TICKET_KEY")
+		RESOLUTION=$(git jira resolution "$TICKET_KEY" 2>/dev/null || true)
+		echo -n "Branch '$BRANCH_NAME' refers to ticket '$TICKET_URL' with resolution '$RESOLUTION'. "
+		if is_fixed "$RESOLUTION"
+		then
+			echo "Deleting."
+			delete_local_and_remote_branch "$BRANCH_NAME"
+		else
+			echo "Skipping."
+		fi
+	done
+}
+
+if [ "$1" = 'setup' ]
+then
+	shift
+	(( $# == 1 )) || usage
+
+	git config --local 'trim.jira.remote' "$1"
+	success "Successfully set the remote for JIRA trimming ('$1')."
+elif [ "$1" = 'jira' ]
+then
+	shift
+	(( $# == 0 )) || usage
+
+	TRIM_REMOTE=$(git config --local 'trim.jira.remote')
+	[ -n "$TRIM_REMOTE" ] || abort "Use 'git trim setup <Git remote for trimming>' to set the trimming parameters first."
+
+	git for-each-ref --format='%(refname:short)' refs/heads/ | git jira translate-branch-name | trim_jira_if_necessary
+elif [ "$1" = 'pr' ]
+then
+	shift
+	(( $# == 0 )) || usage
+
+	for LINE in $(git for-each-ref --format="%(refname:short):%(upstream:short)" refs/heads/ | grep -E ':contrib-[^/]+/.+$')
+	do
+		LOCAL_BRANCH=$(echo "$LINE" | cut -d':' -f 1)
+		UPSTREAM_BRANCH=$(echo "$LINE" | cut -d':' -f 2)
+		echo "Branch '$LOCAL_BRANCH' is tracking the remote branch '$UPSTREAM_BRANCH', which is on a contributor's remote. Deleting."
+		git branch -D "$LOCAL_BRANCH"
+	done
+else
+	usage
+fi
+
