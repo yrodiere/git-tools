@@ -1,0 +1,90 @@
+#!/bin/bash
+# it will clone your existing repo and run the maven tests off this clone
+# the branch tests are run from is the current branch at the time of cloning
+#
+# Note that you can work on the next bug while this is going on
+#
+# git build
+# runs maven clean install
+#
+# git build test -pl module1,module2
+# runs maven test -pl module1,module2
+#
+# For Mac OS users, if growlnotifier is present, a sticky notification will be sent upon build completion.
+# 
+# The environment variable BUILD_COMMAND should contain the command you want to invoke to run the build;
+# I use this so I can forget how each process is built: I use scripts which jump to the right directory,
+# set the right JVM and other necessary tools, including the value of this BUILD_COMMAND.
+# In case of Maven projects a default is set; otherwise the value is mandatory.
+#
+# Many thanks to David Gageot (http://blog.javabien.net) for the inspiration and optimization of this script.
+#
+# Released under the WTFPL license version 2 http://sam.zoy.org/wtfpl/
+#
+# Copyright (c) 2010 David Gageot
+# Copyright (c) 2010-2011 Emmanuel Bernard
+# Copyright (c) 2012-2013 Sanne Grinovero
+
+#the cloned repo will live in /tmp/privatebuild/DIRECTORY_ROOT/REPO_DIRECTORY/CURRENT_COMMITID
+#cleanup is not performed: personally I mount a ram directory on /tmp
+DIRECTORY_ROOT="/tmp/privatebuild/"
+
+#get the last part of the directory name
+IFS="/"
+SPLIT_DIR=(`pwd`)
+SIZE=${#SPLIT_DIR[@]}
+let LAST_INDEX=$SIZE-1
+DIRECTORY_SUFFIX=${SPLIT_DIR[$LAST_INDEX]}
+IFS=""
+
+BRANCH=`git branch | grep "*" | awk '{print $NF}'`
+COMMIT=`git log -1 --pretty=format:%H`
+DIRECTORY="${DIRECTORY_ROOT}${DIRECTORY_SUFFIX}/${COMMIT}"
+
+#fresh clone
+rm -Rf $DIRECTORY
+mkdir -p $DIRECTORY
+git clone -slb "$BRANCH" . $DIRECTORY
+cd $DIRECTORY
+
+echo ""
+echo "***** Working on branch $BRANCH *****"
+echo ""
+echo ""
+
+say() {
+    if [ `uname -s` == "Darwin" ]; then
+        # On Mac OS, notify via Growl
+        which -s growlnotify && growlnotify --name Maven --sticky --message "Maven - Branch $BRANCH - $RESULT"
+    fi
+    if [ `uname -s` == "Linux" ]; then
+        # On Linux, notify via notify-send
+        which notify-send && notify-send "Maven - branch $BRANCH" "$RESULT"
+    fi
+}
+
+# Allow for environment variable to override the build command for this project:
+# (I have aliased scripts setting up a specific environment for each project I work on)
+if [ -e "pom.xml" ]; then
+   # For Maven projects we can assume a default:
+   BUILD_CMD=${BUILD_COMMAND-"mvn clean install"}
+   if [[ $# -eq 0 ]]; then 
+      eval $BUILD_CMD
+   else
+      mvn "$@" 
+   fi
+else
+   ${BUILD_COMMAND:?"Variable BUILD_COMMAND needs to be set for non-maven projects. No pom.xml detected."}
+   eval BUILD_COMMAND
+fi
+
+if [ $? -eq 0 ]; then
+  RESULT="Build SUCCESS"
+  echo $RESULT    
+  say
+else
+  RESULT="Build FAILURE"
+  echo $RESULT
+  say
+  exit $?
+fi
