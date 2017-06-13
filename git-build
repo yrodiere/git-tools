@@ -25,6 +25,8 @@
 # Copyright (c) 2010-2011 Emmanuel Bernard
 # Copyright (c) 2012-2013 Sanne Grinovero
 
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
+
 #the cloned repo will live in /tmp/privatebuild/DIRECTORY_ROOT/REPO_DIRECTORY/CURRENT_COMMITID
 #cleanup is not performed: personally I mount a ram directory on /tmp
 DIRECTORY_ROOT="/tmp/privatebuild/"
@@ -47,10 +49,10 @@ mkdir -p $DIRECTORY
 git clone -slb "$BRANCH" . $DIRECTORY
 cd $DIRECTORY
 
-echo ""
-echo "***** Working on branch $BRANCH *****"
-echo ""
-echo ""
+log ""
+log "***** Working on branch $BRANCH *****"
+log ""
+log ""
 
 say() {
     if [ `uname -s` == "Darwin" ]; then
@@ -74,17 +76,19 @@ if [ -e "pom.xml" ]; then
       mvn "$@" 
    fi
 else
-   ${BUILD_COMMAND:?"Variable BUILD_COMMAND needs to be set for non-maven projects. No pom.xml detected."}
+   if [ -z "$BUILD_COMMAND" ]
+   then
+      abort "Variable BUILD_COMMAND needs to be set for non-maven projects. No pom.xml detected."
+   fi
    eval BUILD_COMMAND
 fi
 
 if [ $? -eq 0 ]; then
   RESULT="Build SUCCESS"
-  echo $RESULT    
   say
+  success $RESULT
 else
   RESULT="Build FAILURE"
-  echo $RESULT
   say
-  exit $?
+  abort $RESULT
 fi
