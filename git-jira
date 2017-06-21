@@ -67,7 +67,7 @@ then
 	shift
 	(( $# == 0 )) || usage
 	# Output: <input><tab><ticket name><tab><base branch (if any)>
-	sed -r 's/^('"$PROJECT_KEY"'-[[:digit:]]+)(-([.[:digit:]]+))?$/\0\t\1\t\3/;t;d;'
+	sed -r 's/^('"$PROJECT_KEY"'-[[:digit:]]+)(-(([.[:digit:]]+)|.*))?$/\0\t\1\t\4/;t;d;'
 else
 	usage
 fi
