@@ -63,9 +63,7 @@ then
 	success "Successfully set target repository for pull requests to '$1'."
 fi
 
-REPOSITORY_NAME=$(git config --local 'pr.repository.name')
-
-[ -n "$REPOSITORY_NAME" ] || abort "Use 'git pr setup <repository-name>' to set the repository name first."
+REPOSITORY_NAME=$(git config --local 'pr.repository.name' || abort "Use 'git pr setup <repository-name>' to set the repository name first.")
 
 if [ "$1" == 'create' ]
 then

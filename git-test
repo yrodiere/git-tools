@@ -9,14 +9,11 @@ then
 	success "Successfully set the remote to push to for tests to '$1'."
 fi
 
-REMOTE=$(git config --local 'ci.test.remote')
-
-[ -n "$REMOTE" ] || abort "Use 'git test setup <remote>' to set the remote to push to first."
+REMOTE=$(git config --local 'ci.test.remote' || abort "Use 'git test setup <remote>' to set the remote to push to first.")
 
 COMMIT=$(git rev-parse ${1:-HEAD})
 
-BRANCH=$(git config 'ci.test.branch')
-[ -n "$BRANCH" ] || abort 'Internal error: the test branch has not been set up.'
+BRANCH=$(git config 'ci.test.branch' || abort 'Internal error: the test branch has not been set up.')
 
 git update-ref "refs/heads/$BRANCH" "$COMMIT"
 git push --force "$REMOTE" "$BRANCH":"$BRANCH"
