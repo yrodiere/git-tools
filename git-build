@@ -43,29 +43,41 @@ let LAST_INDEX=$SIZE-1
 DIRECTORY_SUFFIX=${SPLIT_DIR[$LAST_INDEX]}
 IFS=""
 
-BRANCH=`git branch | grep "*" | awk '{print $NF}'`
-COMMIT=`git log -1 --pretty=format:%H`
+COMMIT=`git rev-parse HEAD`
+if SYMBOLIC_REF=`git symbolic-ref -q --short HEAD`
+then
+	READABLE_REF="$SYMBOLIC_REF"
+else
+	READABLE_REF="$COMMIT"
+fi
 DIRECTORY="${DIRECTORY_ROOT}${DIRECTORY_SUFFIX}/${COMMIT}"
 
 #fresh clone
 rm -Rf $DIRECTORY
 mkdir -p $DIRECTORY
-git clone -slb "$BRANCH" . $DIRECTORY
-cd $DIRECTORY
+if [ -n "$SYMBOLIC_REF" ]
+then
+	git clone -sl -b "$SYMBOLIC_REF" . $DIRECTORY
+	cd $DIRECTORY
+else
+	git clone -sl . $DIRECTORY
+	cd $DIRECTORY
+	git checkout $COMMIT
+fi
 
 log ""
-log "***** Working on branch $BRANCH *****"
+log "***** Working on ref $READABLE_REF *****"
 log ""
 log ""
 
 say() {
 	if [ `uname -s` == "Darwin" ]; then
 		# On Mac OS, notify via Growl
-		which -s growlnotify && growlnotify --name Maven --sticky --message "Maven - Branch $BRANCH - $RESULT"
+		which -s growlnotify && growlnotify --name Maven --sticky --message "Maven - git ref $READABLE_REF - $RESULT"
 	fi
 	if [ `uname -s` == "Linux" ]; then
 		# On Linux, notify via notify-send
-		which notify-send && notify-send "Maven - branch $BRANCH" "$RESULT"
+		which notify-send && notify-send "Maven - Ref $READABLE_REF" "$RESULT"
 	fi
 }
 
