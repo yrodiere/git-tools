@@ -14,11 +14,10 @@
 #
 # Many thanks to David Gageot (http://blog.javabien.net) for the inspiration and optimization of this script.
 #
-# Released under the WTFPL license version 2 http://sam.zoy.org/wtfpl/
-#
 # Copyright (c) 2010 David Gageot
 # Copyright (c) 2010-2011 Emmanuel Bernard
 # Copyright (c) 2012-2013 Sanne Grinovero
+# Copyright (c) 2017 Yoann Rodiere
 
 source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
 
