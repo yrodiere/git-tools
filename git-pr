@@ -40,20 +40,40 @@ function checkout_missing() {
 
 function create_pr() {
 	local FORK_BRANCH="$1"
-	local JIRA_TICKET_KEY="${2:-$(echo $FORK_BRANCH | git jira translate-branch-name | cut -f 2)}"
-	local UPSTREAM_HEAD_BRANCH="${3:-$(echo $FORK_BRANCH | git jira translate-branch-name | cut -f 3)}"
+	local JIRA_TICKET_KEY="$2"
+	if [ -z "$JIRA_TICKET_KEY" ]
+	then
+		JIRA_TICKET_KEY="$(echo $FORK_BRANCH | git jira translate-branch-name 2>/dev/null | cut -f 2 || true)"
+		if [ -z "$JIRA_TICKET_KEY" ]
+		then
+			log "WARNING: The JIRA ticket could not be detected (either because the branch name does not include this information \
+or because git-jira is not set up). The PR title and text won't be populated automatically."
+		fi
+	fi
+	local UPSTREAM_HEAD_BRANCH="$3"
 	if [ -z "$UPSTREAM_HEAD_BRANCH" ]
 	then
-		UPSTREAM_HEAD_BRANCH=$(git fork get upstream.branch.head.relative)
+		UPSTREAM_HEAD_BRANCH="$(echo $FORK_BRANCH | git jira translate-branch-name 2>/dev/null | cut -f 3 || true)"
+		if [ -z "$UPSTREAM_HEAD_BRANCH" ]
+		then
+			UPSTREAM_HEAD_BRANCH=$(git fork get upstream.branch.head.relative)
+			log "WARNING: The upstream branch for the current branch could not be detected (either because the branch name does not include this information \
+or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
+		fi
 	fi
 
 	local UPSTREAM_URL="$(git fork get upstream.url.http)"
 	local FORK_USERNAME="$(git fork get user.name)"
 
-	local TITLE=$(echo "$JIRA_TICKET_KEY $(git jira summary $JIRA_TICKET_KEY)" | urlencode)
-	local BODY=$(git jira url $JIRA_TICKET_KEY | urlencode)
+	PR_CREATE_URL="$UPSTREAM_URL/compare/$UPSTREAM_HEAD_BRANCH...$FORK_USERNAME:$FORK_BRANCH?expand=1"
+	if [ -n "$JIRA_TICKET_KEY" ]
+	then
+		local TITLE=$(echo "$JIRA_TICKET_KEY $(git jira summary $JIRA_TICKET_KEY)" | urlencode)
+		local BODY=$(git jira url $JIRA_TICKET_KEY | urlencode)
+		PR_CREATE_URL+="&title=$TITLE&body=$BODY"
+	fi
 
-	xdg-open "$UPSTREAM_URL/compare/$UPSTREAM_HEAD_BRANCH...$FORK_USERNAME:$FORK_BRANCH?expand=1&title=$TITLE&body=$BODY"
+	xdg-open "$PR_CREATE_URL"
 }
 
 if [ "$1" = 'setup' ]
