@@ -8,7 +8,7 @@ then
 	git fork "${@}"
 fi
 
-SOURCE_REMOTE=$(git fork upstream.remote)
-TARGET_REMOTE=$(git fork remote)
+SOURCE_REMOTE=$(git fork get upstream.remote)
+TARGET_REMOTE=$(git fork get remote)
 
 git remote-sync "$SOURCE_REMOTE" "$TARGET_REMOTE"

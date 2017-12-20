@@ -7,15 +7,15 @@ function usage() {
 	log "Usage:"
 	log -e "\tgit fork setup <upstream-remote> <fork-remote>"
 	log -e "OR"
-	log -e "\tgit fork upstream.remote"
+	log -e "\tgit fork get upstream.remote"
 	log -e "OR"
-	log -e "\tgit fork upstream.url.http"
+	log -e "\tgit fork get upstream.url.http"
 	log -e "OR"
-	log -e "\tgit fork upstream.branch.head.relative"
+	log -e "\tgit fork get upstream.branch.head.relative"
 	log -e "OR"
-	log -e "\tgit fork remote"
+	log -e "\tgit fork get remote"
 	log -e "OR"
-	log -e "\tgit fork user.name"
+	log -e "\tgit fork get user.name"
 	abort
 }
 
@@ -34,6 +34,11 @@ then
 	git config --local fork.upstream.remote "$1"
 	git config --local fork.remote "$2"
 	success "Successfully set the upstream remote ('$1') and the fork remote ('$2')."
+elif [ "$1" = 'get' ]
+then
+	shift
+else
+	usage
 fi
 
 UPSTREAM_REMOTE=$(git config --local fork.upstream.remote \
