@@ -62,7 +62,13 @@ elif [ "$1" = 'upstream.branch.head.relative' ]
 then
 	shift
 	(( $# == 0 )) || usage
-	git rev-parse --abbrev-ref "$UPSTREAM_REMOTE/HEAD" | sed -r "s,^$UPSTREAM_REMOTE/,,"
+	if ! UPSTREAM_HEAD=$(git rev-parse --abbrev-ref "$UPSTREAM_REMOTE/HEAD" 2>/dev/null)
+	then
+		# Maybe the upstream HEAD was not set yet, try to set it automatically
+		git remote set-head -a "$UPSTREAM_REMOTE" 1>&2
+		UPSTREAM_HEAD=$(git rev-parse --abbrev-ref "$UPSTREAM_REMOTE/HEAD")
+	fi
+	echo $UPSTREAM_HEAD | sed -r "s,^$UPSTREAM_REMOTE/,,"
 elif [ "$1" = 'remote' ]
 then
 	shift
