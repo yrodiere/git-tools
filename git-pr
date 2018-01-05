@@ -76,14 +76,8 @@ or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 	xdg-open "$PR_CREATE_URL"
 }
 
-if [ "$1" = 'setup' ]
-then
-	shift
-	git config --local 'pr.repository.name' "$1"
-	success "Successfully set target repository for pull requests to '$1'."
-fi
-
-REPOSITORY_NAME=$(git config --local 'pr.repository.name' || abort "Use 'git pr setup <repository-name>' to set the repository name first.")
+# Automatically clean up an old configuration property
+git config --local unset 'pr.repository.name' 1>/dev/null 2>&1 && log "Cleaned up old configuration property 'pr.repository.name'" | true
 
 if [ "$1" == 'create' ]
 then
@@ -110,6 +104,7 @@ then
 else 
 	(( $# == 1 )) || usage
 
+	REPOSITORY_NAME="$(git fork get upstream.repository.name)"
 	REMOTE_USER_NAME=$(echo "$1" | awk -F ':' '{ print $1 }')
 	REMOTE_BRANCH_NAME=$(echo "$1" | awk -F ':' '{ print $2 }')
 
