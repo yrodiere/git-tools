@@ -57,12 +57,12 @@ elif [ "$1" = 'upstream.url.http' ]
 then
 	shift
 	(( $# == 0 )) || usage
-	git remote get-url "$UPSTREAM_REMOTE" | sed -s 's,^git@github.com:,https://github.com/,;s,\.git$,/,;'
+	git remote get-url "$UPSTREAM_REMOTE" | sed -r 's,^git@github.com:(.*)\.git$,https://github.com/\1,'
 elif [ "$1" = 'upstream.branch.head.relative' ]
 then
 	shift
 	(( $# == 0 )) || usage
-	git rev-parse --abbrev-ref "$UPSTREAM_REMOTE/HEAD" | sed -s "s,^$UPSTREAM_REMOTE/,,"
+	git rev-parse --abbrev-ref "$UPSTREAM_REMOTE/HEAD" | sed -r "s,^$UPSTREAM_REMOTE/,,"
 elif [ "$1" = 'remote' ]
 then
 	shift
