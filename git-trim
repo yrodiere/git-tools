@@ -7,8 +7,6 @@ source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
 
 function usage() {
         log 'Usage:'
-        log -e '\tgit trim setup <Git remote for JIRA trimming>'
-        log -e 'OR'
         log -e '\tgit trim jira'
         log -e 'OR'
         log -e '\tgit trim pr'
@@ -55,19 +53,15 @@ function trim_jira_if_necessary() {
 	done
 }
 
-if [ "$1" = 'setup' ]
-then
-	shift
-	(( $# == 1 )) || usage
+# Automatically clean up an old configuration property
+git config --local --unset 'trim.jira.remote' 1>/dev/null 2>&1 && log "Cleaned up old configuration property 'trim.jira.remote'" || true
 
-	git config --local 'trim.jira.remote' "$1"
-	success "Successfully set the remote for JIRA trimming ('$1')."
-elif [ "$1" = 'jira' ]
+if [ "$1" = 'jira' ]
 then
 	shift
 	(( $# == 0 )) || usage
 
-	TRIM_REMOTE=$(git config --local 'trim.jira.remote' || abort "Use 'git trim setup <Git remote for trimming>' to set the trimming parameters first.")
+	TRIM_REMOTE=$(git fork get remote)
 
 	git for-each-ref --format='%(refname:short)' refs/heads/ | git jira translate-branch-name | trim_jira_if_necessary
 elif [ "$1" = 'pr' ]
