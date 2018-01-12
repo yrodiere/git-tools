@@ -10,6 +10,8 @@ function usage() {
         log -e '\tgit trim jira'
         log -e 'OR'
         log -e '\tgit trim pr'
+        log -e 'OR'
+        log -e '\tgit trim list <branch> [<other branch> ...]'
         abort
 }
 
@@ -75,6 +77,18 @@ then
 		UPSTREAM_BRANCH=$(echo "$LINE" | cut -d':' -f 2)
 		echo "Branch '$LOCAL_BRANCH' is tracking the remote branch '$UPSTREAM_BRANCH', which is on a contributor's remote. Deleting."
 		git branch -D "$LOCAL_BRANCH"
+	done
+elif [ "$1" = 'list' ]
+then
+	shift
+	(( $# >= 1 )) || usage
+
+	TRIM_REMOTE=$(git fork get remote)
+
+	for BRANCH_NAME in "${@}"
+	do
+		log "Deleting branch '$BRANCH_NAME'."
+		delete_local_and_remote_branch "$BRANCH_NAME"
 	done
 else
 	usage
