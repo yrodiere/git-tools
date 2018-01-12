@@ -44,13 +44,13 @@ function trim_jira_if_necessary() {
 	do
 		TICKET_URL=$(git jira url "$TICKET_KEY")
 		RESOLUTION=$(git jira resolution "$TICKET_KEY" 2>/dev/null || true)
-		echo -n "Branch '$BRANCH_NAME' refers to ticket '$TICKET_URL' with resolution '$RESOLUTION'. "
+		log -n "Branch '$BRANCH_NAME' refers to ticket '$TICKET_URL' with resolution '$RESOLUTION'. "
 		if is_fixed "$RESOLUTION"
 		then
-			echo "Deleting."
+			log "Deleting."
 			delete_local_and_remote_branch "$BRANCH_NAME"
 		else
-			echo "Skipping."
+			log "Skipping."
 		fi
 	done
 }
@@ -75,7 +75,7 @@ then
 	do
 		LOCAL_BRANCH=$(echo "$LINE" | cut -d':' -f 1)
 		UPSTREAM_BRANCH=$(echo "$LINE" | cut -d':' -f 2)
-		echo "Branch '$LOCAL_BRANCH' is tracking the remote branch '$UPSTREAM_BRANCH', which is on a contributor's remote. Deleting."
+		log "Branch '$LOCAL_BRANCH' is tracking the remote branch '$UPSTREAM_BRANCH', which is on a contributor's remote. Deleting."
 		git branch -D "$LOCAL_BRANCH"
 	done
 elif [ "$1" = 'list' ]
