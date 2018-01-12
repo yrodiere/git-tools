@@ -7,6 +7,8 @@ function usage() {
 	log "Usage:"
 	log -e "\tgit fork setup <upstream-remote> <fork-remote>"
 	log -e "OR"
+	log -e "\tgit fork purge"
+	log -e "OR"
 	log -e "\tgit fork get upstream.remote"
 	log -e "OR"
 	log -e "\tgit fork get upstream.url.http"
@@ -36,6 +38,15 @@ then
 	git config --local fork.upstream.remote "$1"
 	git config --local fork.remote "$2"
 	success "Successfully set the upstream remote ('$1') and the fork remote ('$2')."
+elif [ "$1" = 'purge' ]
+then
+	shift
+	(( $# == 0 )) || usage
+	git config --local --unset fork.upstream.remote || true
+	git config --local --unset fork.remote || true
+	git config --local --unset sync.fork.remote || true
+	git config --local --unset sync.fork.upstream.remote || true
+	success "Successfully removed all configuration for 'git-fork'."
 elif [ "$1" = 'get' ]
 then
 	shift
