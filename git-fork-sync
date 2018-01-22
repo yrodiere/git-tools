@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 
 if [ "$1" = 'setup' ]
 then

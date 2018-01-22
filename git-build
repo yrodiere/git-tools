@@ -19,7 +19,7 @@
 # Copyright (c) 2012-2013 Sanne Grinovero
 # Copyright (c) 2017 Yoann Rodiere
 
-source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 
 #the cloned repo will live in DIRECTORY_ROOT/REPO_DIRECTORY/CURRENT_COMMITID
 #cleanup is not performed: personally I mount a ram directory on /tmp

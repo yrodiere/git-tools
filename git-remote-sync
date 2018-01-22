@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 
 SOURCE="$1"
 TARGET="$2"

@@ -3,7 +3,7 @@
 # * those named after a JIRA ticket based on the status of this ticket
 # * those tracking a contrib-* remote
 
-source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/common.sh
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 
 function usage() {
         log 'Usage:'
