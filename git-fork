@@ -20,6 +20,8 @@ function usage() {
 	log -e "\tgit fork get remote"
 	log -e "OR"
 	log -e "\tgit fork get user.name"
+	log -e "OR"
+	log -e "\tgit fork branch init"
 	abort
 }
 
@@ -47,11 +49,6 @@ then
 	git config --local --unset sync.fork.remote || true
 	git config --local --unset sync.fork.upstream.remote || true
 	success "Successfully removed all configuration for 'git-fork'."
-elif [ "$1" = 'get' ]
-then
-	shift
-else
-	usage
 fi
 
 UPSTREAM_REMOTE=$(git config --local fork.upstream.remote \
@@ -60,6 +57,23 @@ UPSTREAM_REMOTE=$(git config --local fork.upstream.remote \
 FORK_REMOTE=$(git config --local fork.remote \
 	|| convert_legacy sync.fork.remote fork.remote) \
 	|| abort "Use 'git fork setup <upstream-remote> <fork-remote>' first."
+
+if [ "$1" = 'get' ]
+then
+	shift
+elif [ "$1" = 'branch' ]
+then
+	shift
+	if [ "$1" = 'init' ]
+	then
+		git push -u "$FORK_REMOTE" $(git rev-parse --abbrev-ref HEAD)
+		success
+	else
+		usage
+	fi
+else
+	usage
+fi
 
 if [ "$1" = 'upstream.remote' ]
 then
