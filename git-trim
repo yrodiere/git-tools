@@ -11,6 +11,8 @@ function usage() {
         log -e 'OR'
         log -e '\tgit trim pr'
         log -e 'OR'
+        log -e '\tgit trim merged'
+        log -e 'OR'
         log -e '\tgit trim list <branch> [<other branch> ...]'
         abort
 }
@@ -77,6 +79,21 @@ then
 		UPSTREAM_BRANCH=$(echo "$LINE" | cut -d':' -f 2)
 		log "Branch '$LOCAL_BRANCH' is tracking the remote branch '$UPSTREAM_BRANCH', which is on a contributor's remote. Deleting."
 		git branch -D "$LOCAL_BRANCH"
+	done
+elif [ "$1" = 'merged' ]
+then
+	shift
+	(( $# == 0 )) || usage
+
+	TRIM_REMOTE=$(git fork get remote)
+	UPSTREAM_REMOTE=$(git fork get upstream.remote)
+	UPSTREAM_HEAD=$(git fork get upstream.branch.head)
+
+	for LINE in $(git branch --merged "$UPSTREAM_HEAD" --format='%(refname:short):%(upstream:short)' | grep -P -v ":\Q$UPSTREAM_REMOTE\E/")
+	do
+		LOCAL_BRANCH=$(echo "$LINE" | cut -d':' -f 1)
+		log "Branch '$LOCAL_BRANCH' has been merged into '$UPSTREAM_HEAD'. Deleting."
+		delete_local_and_remote_branch "$LOCAL_BRANCH"
 	done
 elif [ "$1" = 'list' ]
 then

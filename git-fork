@@ -85,7 +85,7 @@ then
 	shift
 	(( $# == 0 )) || usage
 	git remote get-url "$UPSTREAM_REMOTE" | sed -r 's,^git@github.com:(.*)\.git$,https://github.com/\1,'
-elif [ "$1" = 'upstream.branch.head.relative' ]
+elif [ "$1" = 'upstream.branch.head' ]
 then
 	shift
 	(( $# == 0 )) || usage
@@ -95,7 +95,12 @@ then
 		git remote set-head -a "$UPSTREAM_REMOTE" 1>&2
 		UPSTREAM_HEAD=$(git rev-parse --abbrev-ref "$UPSTREAM_REMOTE/HEAD")
 	fi
-	echo $UPSTREAM_HEAD | sed -r "s,^$UPSTREAM_REMOTE/,,"
+	echo $UPSTREAM_HEAD
+elif [ "$1" = 'upstream.branch.head.relative' ]
+then
+	shift
+	(( $# == 0 )) || usage
+	"$0" get 'upstream.branch.head' | sed -r "s,^$UPSTREAM_REMOTE/,,"
 elif [ "$1" = 'upstream.repository.name' ]
 then
 	shift
