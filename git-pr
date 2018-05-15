@@ -51,12 +51,13 @@ or because git-jira is not set up). The PR title and text won't be populated aut
 		fi
 	fi
 	local UPSTREAM_HEAD_BRANCH="$3"
+	local UPSTREAM_DEFAULT_HEAD_BRANCH="$(git fork get upstream.branch.head.relative)"
 	if [ -z "$UPSTREAM_HEAD_BRANCH" ]
 	then
 		UPSTREAM_HEAD_BRANCH="$(echo $FORK_BRANCH | git jira translate-branch-name 2>/dev/null | cut -f 3 || true)"
 		if [ -z "$UPSTREAM_HEAD_BRANCH" ]
 		then
-			UPSTREAM_HEAD_BRANCH=$(git fork get upstream.branch.head.relative)
+			UPSTREAM_HEAD_BRANCH="$UPSTREAM_DEFAULT_HEAD_BRANCH"
 			log "WARNING: The upstream branch for the current branch could not be detected (either because the branch name does not include this information \
 or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 		fi
@@ -68,7 +69,13 @@ or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 	PR_CREATE_URL="$UPSTREAM_URL/compare/$UPSTREAM_HEAD_BRANCH...$FORK_USERNAME:$FORK_BRANCH?expand=1"
 	if [ -n "$JIRA_TICKET_KEY" ]
 	then
-		local TITLE=$(echo "$JIRA_TICKET_KEY $(git jira summary $JIRA_TICKET_KEY)" | urlencode)
+		local TITLE
+		if [ "$UPSTREAM_HEAD_BRANCH" = "$UPSTREAM_DEFAULT_HEAD_BRANCH" ]
+		then
+			TITLE=$(echo "$JIRA_TICKET_KEY $(git jira summary $JIRA_TICKET_KEY)" | urlencode)
+		else
+			TITLE=$(echo "Backport $JIRA_TICKET_KEY to branch $UPSTREAM_HEAD_BRANCH - $(git jira summary $JIRA_TICKET_KEY)" | urlencode)
+		fi
 		local BODY=$(git jira url $JIRA_TICKET_KEY | urlencode)
 		PR_CREATE_URL+="&title=$TITLE&body=$BODY"
 	fi
