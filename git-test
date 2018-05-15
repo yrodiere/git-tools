@@ -2,18 +2,31 @@
 
 source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 
+function usage() {
+        log "Usage:"
+        log -e "\tgit test setup <remote to push to for tests>"
+        log -e "OR"
+        log -e "\tgit test <optional commit ref, defaults to HEAD>"
+        abort
+}
+
+function setup_first() {
+        abort "Use 'git test setup <remote to push to for tests>' to set the test settings first."
+}
+
 if [ "$1" = 'setup' ]
 then
 	shift
+	(( $# == 1 )) && [ -n "$1" ] || usage
 	git config --local 'ci.test.remote' "$1"
 	success "Successfully set the remote to push to for tests to '$1'."
 fi
 
-REMOTE=$(git config --local 'ci.test.remote' || abort "Use 'git test setup <remote>' to set the remote to push to first.")
+REMOTE=$(git config --local 'ci.test.remote' || setup_first)
 
 COMMIT=$(git rev-parse ${1:-HEAD})
 
-BRANCH=$(git config 'ci.test.branch' || abort 'Internal error: the test branch has not been set up.')
+BRANCH=$(git config 'ci.test.branch' || abort 'Internal error: the name of the test branch has not been set up.')
 
 git update-ref "refs/heads/$BRANCH" "$COMMIT"
 git push --force "$REMOTE" "$BRANCH":"$BRANCH"

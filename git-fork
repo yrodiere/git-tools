@@ -36,7 +36,7 @@ function convert_legacy() {
 if [ "$1" = 'setup' ]
 then
 	shift
-	(( $# == 2 )) || usage
+	(( $# == 2 )) && [ -n "$1" -a -n "$2" ] || usage
 	git config --local fork.upstream.remote "$1"
 	git config --local fork.remote "$2"
 	success "Successfully set the upstream remote ('$1') and the fork remote ('$2')."

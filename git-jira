@@ -18,7 +18,7 @@ function usage() {
 }
 
 function setup_first() {
-	abort "Use 'git jira setup <JIRA endpoint> <JIRA project key>' to set the JIRA parameters first."
+	abort "Use 'git jira setup <JIRA endpoint> <JIRA project key>' to set the JIRA settings first."
 }
 
 function query_ticket() {
@@ -36,6 +36,7 @@ function extract_field() {
 if [ "$1" = 'setup' ]
 then
 	shift
+	(( $# == 2 )) && [ -n "$1" -a -n "$2" ] || usage
 	git config --local 'jira.endpoint' "$1"
 	git config --local 'jira.project.key' "$2"
 	success "Successfully set the JIRA endpoint ('$1') and project key ('$2')."
