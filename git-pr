@@ -5,6 +5,8 @@ source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 
 function usage() {
 	log 'Usage:'
+       	log -e '\tgit pr setuser <user> <remote url>'
+       	log -e 'OR'
        	log -e '\tgit pr <user>:<branch>'
        	log -e 'OR'
        	log -e '\tgit pr create'
@@ -17,25 +19,8 @@ function usage() {
 	abort
 }
 
-function checkout_existing() {
-	git checkout "$LOCAL_BRANCH_NAME" \
-		&& success "Checked out the pre-existing local branch '$LOCAL_BRANCH_NAME'." \
-		|| abort "Error while checking out the pre-existing local branch '$LOCAL_BRANCH_NAME'."
-}
-
-function fetch_remote() {
-	local REMOTE_NAME="$1"
-	local REMOTE_URL="$2"
-	git remote get-url "$REMOTE_NAME" 2>/dev/null | grep "^$REMOTE_URL\$" \
-		|| git remote add "$REMOTE_NAME" "$REMOTE_URL"
-	git fetch -p "$REMOTE_NAME"
-}
-
-function checkout_missing() {
-	local REMOTE_URL="https://github.com/$REMOTE_USER_NAME/$REPOSITORY_NAME.git"
-	local REMOTE_NAME="contrib-$REMOTE_USER_NAME"
-	fetch_remote "$REMOTE_NAME" "$REMOTE_URL"
-	git checkout -b "$LOCAL_BRANCH_NAME" "$REMOTE_NAME"/"$REMOTE_BRANCH_NAME"
+function create_remote() {
+	git remote add --no-tags "$1" "$2"
 }
 
 function create_pr() {
@@ -83,6 +68,35 @@ or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 	xdg-open "$PR_CREATE_URL"
 }
 
+function get_pr() {
+	local REMOTE_USER_NAME="$1"
+	local REMOTE_BRANCH_NAME="$2"
+
+	local REMOTE_NAME="contrib-$REMOTE_USER_NAME"
+	local LOCAL_BRANCH_NAME="$REMOTE_USER_NAME-$REMOTE_BRANCH_NAME"
+
+	local REPOSITORY_NAME="$(git fork get upstream.repository.name)"
+	local DEFAULT_REMOTE_URL="https://github.com/$REMOTE_USER_NAME/$REPOSITORY_NAME.git"
+
+	# Create the remote if missing
+	git remote get-url "$REMOTE_NAME" 1>&2 2>/dev/null \
+		|| create_remote "$REMOTE_NAME" "$DEFAULT_REMOTE_URL"
+
+	git fetch -p "$REMOTE_NAME"
+
+	if git rev-parse --quiet --verify "$LOCAL_BRANCH_NAME" 1>&2 2>/dev/null
+	then
+		git checkout "$LOCAL_BRANCH_NAME" \
+			&& git pull \
+			&& success "Checked out the pre-existing local branch '$LOCAL_BRANCH_NAME'." \
+			|| abort "Error while checking out the pre-existing local branch '$LOCAL_BRANCH_NAME'."
+	else
+		git checkout -b "$LOCAL_BRANCH_NAME" "$REMOTE_NAME"/"$REMOTE_BRANCH_NAME" \
+			&& success "Checked out a new local branch '$LOCAL_BRANCH_NAME'." \
+			|| abort "Error while checking out a new local branch '$LOCAL_BRANCH_NAME'."
+	fi
+}
+
 # Automatically clean up an old configuration property
 git config --local --unset 'pr.repository.name' 1>/dev/null 2>&1 && log "Cleaned up old configuration property 'pr.repository.name'" || true
 
@@ -107,17 +121,32 @@ then
 	else
 		usage
 	fi
+
 	create_pr "$FORK_BRANCH" "$JIRA_TICKET_KEY" "$UPSTREAM_HEAD_BRANCH"
-else 
+elif [ "$1" == 'setuser' ]
+then
+	shift
+	(( $# == 2 )) || usage
+
+	REMOTE_USER_NAME="$1"
+	REMOTE_URL="$2"
+
+	[ -n "$REMOTE_USER_NAME" -a -n "$REMOTE_URL" ] || usage
+
+	REMOTE_NAME="contrib-$REMOTE_USER_NAME"
+
+	git remote remove "$REMOTE_NAME" 1>&2 2>/dev/null || true
+	create_remote "$REMOTE_NAME" "$REMOTE_URL"
+
+	success "Successfully set remote '$REMOTE_NAME' to '$REMOTE_URL'"
+else
 	(( $# == 1 )) || usage
 
-	REPOSITORY_NAME="$(git fork get upstream.repository.name)"
 	REMOTE_USER_NAME=$(echo "$1" | awk -F ':' '{ print $1 }')
 	REMOTE_BRANCH_NAME=$(echo "$1" | awk -F ':' '{ print $2 }')
 
 	[ -n "$REMOTE_USER_NAME" -a -n "$REMOTE_BRANCH_NAME" ] || usage
 
-	LOCAL_BRANCH_NAME="$REMOTE_USER_NAME-$REMOTE_BRANCH_NAME"
+	get_pr "$REMOTE_USER_NAME" "$REMOTE_BRANCH_NAME"
 
-	git rev-parse --quiet --verify "$LOCAL_BRANCH_NAME" && checkout_existing || checkout_missing
 fi
