@@ -22,8 +22,10 @@ function setup_first() {
 }
 
 function query_ticket() {
-	local TICKET_KEY="$1"
-	local URL="$ENDPOINT/rest/api/2/issue/$TICKET_KEY"
+	local TICKET_KEY
+	TICKET_KEY="$1"
+	local URL
+	URL="$ENDPOINT/rest/api/2/issue/$TICKET_KEY"
 	curl -s -X GET -L -f -H "Content-Type: application/json" "$URL" \
 		|| abort "Failed to retrieve ticket '$TICKET_KEY' from '$URL'"
 }

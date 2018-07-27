@@ -18,7 +18,8 @@ function usage() {
 }
 
 function is_fixed() {
-	local RESOLUTION="$1"
+	local RESOLUTION
+	RESOLUTION="$1"
 	case $RESOLUTION in
 	Fixed)
 		true
@@ -30,11 +31,14 @@ function is_fixed() {
 }
 
 function delete_local_and_remote_branch() {
-	local BRANCH_NAME="$1"
-	local UPSTREAM=$(git for-each-ref --format='%(upstream:short)' "refs/heads/$BRANCH_NAME")
+	local BRANCH_NAME
+	BRANCH_NAME="$1"
+	local UPSTREAM
+	UPSTREAM=$(git for-each-ref --format='%(upstream:short)' "refs/heads/$BRANCH_NAME")
 	if [[ "$UPSTREAM" =~ ^"$TRIM_REMOTE/" ]]
 	then
-		local UPSTREAM_BRANCH=$(echo "$UPSTREAM" | cut -d'/' -f 2)
+		local UPSTREAM_BRANCH
+		UPSTREAM_BRANCH=$(echo "$UPSTREAM" | cut -d'/' -f 2)
 		git push --delete "$TRIM_REMOTE" "$UPSTREAM_BRANCH" \
 			|| log "Deleting '$UPSTREAM_BRANCH' on '$TRIM_REMOTE' failed, probably because the branch no longer exists. Ignoring."
 	fi

@@ -24,8 +24,10 @@ function create_remote() {
 }
 
 function create_pr() {
-	local FORK_BRANCH="$1"
-	local JIRA_TICKET_KEY="$2"
+	local FORK_BRANCH
+	FORK_BRANCH="$1"
+	local JIRA_TICKET_KEY
+	JIRA_TICKET_KEY="$2"
 	if [ -z "$JIRA_TICKET_KEY" ]
 	then
 		JIRA_TICKET_KEY="$(echo $FORK_BRANCH | git jira translate-branch-name 2>/dev/null | cut -f 2 || true)"
@@ -35,8 +37,10 @@ function create_pr() {
 or because git-jira is not set up). The PR title and text won't be populated automatically."
 		fi
 	fi
-	local UPSTREAM_HEAD_BRANCH="$3"
-	local UPSTREAM_DEFAULT_HEAD_BRANCH="$(git fork get upstream.branch.head.relative)"
+	local UPSTREAM_HEAD_BRANCH
+	UPSTREAM_HEAD_BRANCH="$3"
+	local UPSTREAM_DEFAULT_HEAD_BRANCH
+	UPSTREAM_DEFAULT_HEAD_BRANCH="$(git fork get upstream.branch.head.relative)"
 	if [ -z "$UPSTREAM_HEAD_BRANCH" ]
 	then
 		UPSTREAM_HEAD_BRANCH="$(echo $FORK_BRANCH | git jira translate-branch-name 2>/dev/null | cut -f 3 || true)"
@@ -48,8 +52,10 @@ or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 		fi
 	fi
 
-	local UPSTREAM_URL="$(git fork get upstream.url.http)"
-	local FORK_USERNAME="$(git fork get user.name)"
+	local UPSTREAM_URL
+	UPSTREAM_URL="$(git fork get upstream.url.http)"
+	local FORK_USERNAME
+	FORK_USERNAME="$(git fork get user.name)"
 
 	PR_CREATE_URL="$UPSTREAM_URL/compare/$UPSTREAM_HEAD_BRANCH...$FORK_USERNAME:$FORK_BRANCH?expand=1"
 	if [ -n "$JIRA_TICKET_KEY" ]
@@ -61,7 +67,8 @@ or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 		else
 			TITLE=$(echo "Backport $JIRA_TICKET_KEY to branch $UPSTREAM_HEAD_BRANCH - $(git jira summary $JIRA_TICKET_KEY)" | urlencode)
 		fi
-		local BODY=$(git jira url $JIRA_TICKET_KEY | urlencode)
+		local BODY
+		BODY=$(git jira url $JIRA_TICKET_KEY | urlencode)
 		PR_CREATE_URL+="&title=$TITLE&body=$BODY"
 	fi
 
@@ -69,14 +76,20 @@ or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 }
 
 function get_pr() {
-	local REMOTE_USER_NAME="$1"
-	local REMOTE_BRANCH_NAME="$2"
+	local REMOTE_USER_NAME
+	REMOTE_USER_NAME="$1"
+	local REMOTE_BRANCH_NAME
+	REMOTE_BRANCH_NAME="$2"
 
-	local REMOTE_NAME="contrib-$REMOTE_USER_NAME"
-	local LOCAL_BRANCH_NAME="$REMOTE_USER_NAME-$REMOTE_BRANCH_NAME"
+	local REMOTE_NAME
+	REMOTE_NAME="contrib-$REMOTE_USER_NAME"
+	local LOCAL_BRANCH_NAME
+	LOCAL_BRANCH_NAME="$REMOTE_USER_NAME-$REMOTE_BRANCH_NAME"
 
-	local REPOSITORY_NAME="$(git fork get upstream.repository.name)"
-	local DEFAULT_REMOTE_URL="https://github.com/$REMOTE_USER_NAME/$REPOSITORY_NAME.git"
+	local REPOSITORY_NAME
+	REPOSITORY_NAME="$(git fork get upstream.repository.name)"
+	local DEFAULT_REMOTE_URL
+	DEFAULT_REMOTE_URL="https://github.com/$REMOTE_USER_NAME/$REPOSITORY_NAME.git"
 
 	# Create the remote if missing
 	git remote get-url "$REMOTE_NAME" 1>&2 2>/dev/null \
