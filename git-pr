@@ -89,7 +89,9 @@ function get_pr() {
 	local REPOSITORY_NAME
 	REPOSITORY_NAME="$(git fork get upstream.repository.name)"
 	local DEFAULT_REMOTE_URL
-	DEFAULT_REMOTE_URL="https://github.com/$REMOTE_USER_NAME/$REPOSITORY_NAME.git"
+	# Use SSH because that's the protocol that is most likely to have authentication configured
+	# and authentication is necessary for private repositories
+	DEFAULT_REMOTE_URL="git@github.com:$REMOTE_USER_NAME/$REPOSITORY_NAME.git"
 
 	# Create the remote if missing
 	git remote get-url "$REMOTE_NAME" 1>&2 2>/dev/null \
