@@ -26,29 +26,45 @@ function create_remote() {
 function create_pr() {
 	local FORK_BRANCH
 	FORK_BRANCH="$1"
-	local JIRA_TICKET_KEY
-	JIRA_TICKET_KEY="$2"
-	if [ -z "$JIRA_TICKET_KEY" ]
-	then
-		JIRA_TICKET_KEY="$(echo $FORK_BRANCH | git jira translate-branch-name 2>/dev/null | cut -f 2 || true)"
-		if [ -z "$JIRA_TICKET_KEY" ]
-		then
-			log "WARNING: The JIRA ticket could not be detected (either because the branch name does not include this information \
-or because git-jira is not set up). The PR title and text won't be populated automatically."
-		fi
-	fi
+
+	local JIRA_INFO
+	JIRA_INFO=( $(echo $FORK_BRANCH | git jira translate-branch-name 2>/dev/null || true) )
+
 	local UPSTREAM_HEAD_BRANCH
 	UPSTREAM_HEAD_BRANCH="$3"
 	local UPSTREAM_DEFAULT_HEAD_BRANCH
 	UPSTREAM_DEFAULT_HEAD_BRANCH="$(git fork get upstream.branch.head.relative)"
 	if [ -z "$UPSTREAM_HEAD_BRANCH" ]
 	then
-		UPSTREAM_HEAD_BRANCH="$(echo $FORK_BRANCH | git jira translate-branch-name 2>/dev/null | cut -f 3 || true)"
+		UPSTREAM_HEAD_BRANCH="${JIRA_INFO[2]}"
+		if [ -z "$UPSTREAM_HEAD_BRANCH" ]
+		then
+			UPSTREAM_HEAD_BRANCH="$(git fork closest-upstream-branch-name $FORK_BRANCH 2>/dev/null || true)"
+		fi
 		if [ -z "$UPSTREAM_HEAD_BRANCH" ]
 		then
 			UPSTREAM_HEAD_BRANCH="$UPSTREAM_DEFAULT_HEAD_BRANCH"
 			log "WARNING: The upstream branch for the current branch could not be detected (either because the branch name does not include this information \
 or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
+		fi
+	fi
+
+	local JIRA_TICKET_KEYS=( $2 )
+	if (( ${#JIRA_TICKET_KEYS[@]} == 0 ))
+	then
+		JIRA_TICKET_KEYS_STRING="$(git log "$UPSTREAM_HEAD_BRANCH..$FORK_BRANCH" --format="%s" | git jira extract-ticket-keys 2>/dev/null || true)"
+		JIRA_TICKET_KEYS=( $JIRA_TICKET_KEYS_STRING )
+		if (( ${#JIRA_TICKET_KEYS[@]} < 0 || 5 < ${#JIRA_TICKET_KEYS[@]} ))
+		then
+			log "WARNING: Failed to detect JIRA tickets from commit messages. Defaulting to detecting the JIRA ticket from the branch name."
+			BRANCH_JIRA_TICKET_KEY="${JIRA_INFO[1]}"
+			if [ -n "$BRANCH_JIRA_TICKET_KEY" ]
+			then
+				JIRA_TICKET_KEYS=( "$BRANCH_JIRA_TICKET_KEY" )
+			else
+				log "WARNING: The JIRA ticket could not be detected (either because branch name and commit messages do not include this information \
+or because git-jira is not set up). The PR title and text won't be populated automatically."
+			fi
 		fi
 	fi
 
@@ -58,17 +74,19 @@ or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 	FORK_USERNAME="$(git fork get user.name)"
 
 	PR_CREATE_URL="$UPSTREAM_URL/compare/$UPSTREAM_HEAD_BRANCH...$FORK_USERNAME:$FORK_BRANCH?expand=1"
-	if [ -n "$JIRA_TICKET_KEY" ]
+	if (( ${#JIRA_TICKET_KEYS[@]} > 0 ))
 	then
-		local TITLE
+		local MAIN_JIRA_TICKET_KEY=${JIRA_TICKET_KEYS[0]}
+		local MAIN_JIRA_TICKET_SUMMARY="$(git jira summary $MAIN_JIRA_TICKET_KEY)"
+		local JIRA_TICKET_KEYS_FOR_TITLE="$(echo "${JIRA_TICKET_KEYS[@]}" | sed -E 's/ / + /g')"
 		if [ "$UPSTREAM_HEAD_BRANCH" = "$UPSTREAM_DEFAULT_HEAD_BRANCH" ]
 		then
-			TITLE=$(echo "$JIRA_TICKET_KEY $(git jira summary $JIRA_TICKET_KEY)" | urlencode)
+			TITLE=$(echo "${JIRA_TICKET_KEYS_FOR_TITLE//[\n\s]+/ + /} $MAIN_JIRA_TICKET_SUMMARY" | urlencode)
 		else
-			TITLE=$(echo "Backport $JIRA_TICKET_KEY to branch $UPSTREAM_HEAD_BRANCH - $(git jira summary $JIRA_TICKET_KEY)" | urlencode)
+			TITLE=$(echo "Backport $JIRA_TICKET_KEYS_FOR_TITLE to branch $UPSTREAM_HEAD_BRANCH - $MAIN_JIRA_TICKET_SUMMARY" | urlencode)
 		fi
 		local BODY
-		BODY=$(git jira url $JIRA_TICKET_KEY | urlencode)
+		BODY=$(echo "${JIRA_TICKET_KEYS[@]}" | sed -E 's/ /\n/g' | xargs -n 1 git jira url | urlencode)
 		PR_CREATE_URL+="&title=$TITLE&body=$BODY"
 	fi
 

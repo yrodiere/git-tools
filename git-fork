@@ -22,6 +22,8 @@ function usage() {
 	log -e "\tgit fork get user.name"
 	log -e "OR"
 	log -e "\tgit fork branch init"
+	log -e "OR"
+	log -e "\tgit fork closest-upstream-branch-name <revision>"
 	abort
 }
 
@@ -71,6 +73,17 @@ then
 	else
 		usage
 	fi
+elif [ "$1" = 'closest-upstream-branch-name' ]
+then
+	shift
+	(( $# == 1 )) || usage
+	REVISION="$1"
+	shift
+	git log "$REVISION" --format="%D" --decorate=full --decorate-refs='refs/remotes/'$UPSTREAM_REMOTE'/*' --decorate-refs='refs/heads/*' \
+		| grep -v '^$' | sed -E 's/, /\n/g' \
+		| sed -E 's,^refs/remotes/'$UPSTRAM_REMOTE'upstream/(.*),\1,;t;s,^refs/heads/(master|[[:digit:]]+.[[:digit:]]+),\1,;t;d' \
+		| head -n 1
+	success
 else
 	usage
 fi

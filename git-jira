@@ -14,6 +14,8 @@ function usage() {
 	log -e "\tgit jira summary <JIRA ticket key>"
 	log -e "OR"
 	log -e "\tgit jira translate-branch-name"
+	log -e "OR"
+	log -e "\tgit jira extract-ticket-keys"
 	abort
 }
 
@@ -71,6 +73,11 @@ then
 	(( $# == 0 )) || usage
 	# Output: <input><tab><ticket name><tab><base branch (if any)>
 	sed -r 's/^('"$PROJECT_KEY"'-[[:digit:]]+)(-(([.[:digit:]]+)|.*))?$/\0\t\1\t\4/;t;d;'
+elif [ "$1" = 'extract-ticket-keys' ]
+then
+	shift
+	(( $# == 0 )) || usage
+	sed -E 's/^('"$PROJECT_KEY"'-[[:digit:]]+) .*/\1/;t;d;' | sort -u
 else
 	usage
 fi
