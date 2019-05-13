@@ -77,7 +77,12 @@ or because git-jira is not set up). The PR title and text won't be populated aut
 	if (( ${#JIRA_TICKET_KEYS[@]} > 0 ))
 	then
 		local MAIN_JIRA_TICKET_KEY=${JIRA_TICKET_KEYS[0]}
-		local MAIN_JIRA_TICKET_SUMMARY="$(git jira summary $MAIN_JIRA_TICKET_KEY)"
+		local -A JIRA_TICKET_SUMMARIES
+		for key in "${JIRA_TICKET_KEYS[@]}"
+		do
+			JIRA_TICKET_SUMMARIES[$key]="$(git jira summary $key)"
+		done
+		local MAIN_JIRA_TICKET_SUMMARY="${JIRA_TICKET_SUMMARIES[$MAIN_JIRA_TICKET_KEY]}"
 		local JIRA_TICKET_KEYS_FOR_TITLE="$(echo "${JIRA_TICKET_KEYS[@]}" | sed -E 's/ / + /g')"
 		if [ "$UPSTREAM_HEAD_BRANCH" = "$UPSTREAM_DEFAULT_HEAD_BRANCH" ]
 		then
@@ -86,7 +91,18 @@ or because git-jira is not set up). The PR title and text won't be populated aut
 			TITLE=$(echo "Backport $JIRA_TICKET_KEYS_FOR_TITLE to branch $UPSTREAM_HEAD_BRANCH - $MAIN_JIRA_TICKET_SUMMARY" | urlencode)
 		fi
 		local BODY
-		BODY=$(echo "${JIRA_TICKET_KEYS[@]}" | sed -E 's/ /\n/g' | xargs -n 1 git jira url | urlencode)
+		if (( ${#JIRA_TICKET_KEYS[@]} == 1 ))
+		then
+			BODY=$(git jira url "${MAIN_JIRA_TICKET_KEY}" | urlencode)
+		else
+			for i in "${!JIRA_TICKET_KEYS[@]}"
+			do
+				local key=${JIRA_TICKET_KEYS[$i]}
+				BODY+="* [$key]($(git jira url $key)): ${JIRA_TICKET_SUMMARIES[$key]}"
+				BODY+=$'\n'
+			done
+			BODY=$(echo "$BODY" | urlencode)
+		fi
 		PR_CREATE_URL+="&title=$TITLE&body=$BODY"
 	fi
 
