@@ -46,7 +46,8 @@ then
 	success "Successfully set the JIRA endpoint ('$1') and project key ('$2')."
 fi
 
-ENDPOINT=$(git config --local 'jira.endpoint' || setup_first)
+# Remove trailing slashes to avoid problems in chrome (JIRA probably has some buggy javascript)
+ENDPOINT=$(git config --local 'jira.endpoint' | sed -E 's,/+$,,' || setup_first)
 PROJECT_KEY=$(git config --local 'jira.project.key' || setup_first)
 
 if [ "$1" = 'url' ]
