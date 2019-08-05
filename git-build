@@ -59,11 +59,11 @@ log ""
 say() {
 	if [ `uname -s` == "Darwin" ]; then
 		# On Mac OS, notify via Growl
-		which -s growlnotify && growlnotify --name Maven --sticky --message "Maven - git ref $READABLE_REF - $RESULT"
+		which -s growlnotify 1>/dev/null && growlnotify --name Maven --sticky --message "Maven - git ref $READABLE_REF - $RESULT"
 	fi
 	if [ `uname -s` == "Linux" ]; then
 		# On Linux, notify via notify-send
-		which notify-send && notify-send "Maven - Ref $READABLE_REF" "$RESULT"
+		which notify-send 1>/dev/null && notify-send "Maven - Ref $READABLE_REF" "$RESULT"
 	fi
 }
 
