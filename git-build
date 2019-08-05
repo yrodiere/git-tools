@@ -21,13 +21,15 @@
 
 source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 
+SOURCE_DIRECTORY="$(pwd)"
+
 #the cloned repo will live in DIRECTORY_ROOT/REPO_DIRECTORY/CURRENT_COMMITID
 #cleanup is not performed: personally I mount a ram directory on /tmp
 DIRECTORY_ROOT=$(git config 'build.root') \
 	|| DIRECTORY_ROOT="/tmp/privatebuild/"
 
 #get the last part of the directory name
-DIRECTORY_SUFFIX="$(basename -s "" "$(pwd)")"
+DIRECTORY_SUFFIX="$(basename -s "" "$SOURCE_DIRECTORY")"
 
 COMMIT=`git rev-parse HEAD`
 if SYMBOLIC_REF=`git symbolic-ref -q --short HEAD`
@@ -59,11 +61,11 @@ log ""
 say() {
 	if [ `uname -s` == "Darwin" ]; then
 		# On Mac OS, notify via Growl
-		which -s growlnotify 1>/dev/null && growlnotify --name Maven --sticky --message "Maven - git ref $READABLE_REF - $RESULT"
+		which -s growlnotify 1>/dev/null && growlnotify --name Maven --sticky --message "$2: $1"
 	fi
 	if [ `uname -s` == "Linux" ]; then
 		# On Linux, notify via notify-send
-		which notify-send 1>/dev/null && notify-send "Maven - Ref $READABLE_REF" "$RESULT"
+		which notify-send 1>/dev/null && notify-send "$1" "$2"
 	fi
 }
 
@@ -81,12 +83,16 @@ else
 	abort "Build command must be provided as parameters for non-maven projects. No pom.xml detected."
 fi
 
-if [ $? -eq 0 ]; then
-	RESULT="Build SUCCESS"
-	say
-	success $RESULT
+RESULT=$?
+
+NOTIFICATION_TITLE="git-build '$READABLE_REF' from '$SOURCE_DIRECTORY'"
+if (( $RESULT == 0 ))
+then
+	NOTIFICATION_BODY="SUCCESS"
+	say "$NOTIFICATION_TITLE" "$NOTIFICATION_BODY"
+	success "$NOTIFICATION_TITLE: $NOTIFICATION_BODY"
 else
-	RESULT="Build FAILURE"
-	say
-	abort $RESULT
+	NOTIFICATION_BODY="FAILURE"
+	say "$NOTIFICATION_TITLE" "$NOTIFICATION_BODY"
+	abort "$NOTIFICATION_TITLE: $NOTIFICATION_BODY"
 fi
