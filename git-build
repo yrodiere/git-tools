@@ -67,9 +67,13 @@ say() {
 	fi
 }
 
+# Make sure the following commands won't abort the script if they fail,
+# which is the default behavior with the lib/common.sh import at the top of this script.
+set +o errexit
+
 # Allow for parameters to override the build command for this project:
 if [[ $# -ne 0 ]]; then 
-	eval "${@}" 
+	eval "${@}"
 elif [ -e "pom.xml" ]; then
 	# For Maven projects we can assume a default:
 	mvn clean install
