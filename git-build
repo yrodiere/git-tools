@@ -27,12 +27,7 @@ DIRECTORY_ROOT=$(git config 'build.root') \
 	|| DIRECTORY_ROOT="/tmp/privatebuild/"
 
 #get the last part of the directory name
-IFS="/"
-SPLIT_DIR=(`pwd`)
-SIZE=${#SPLIT_DIR[@]}
-let LAST_INDEX=$SIZE-1
-DIRECTORY_SUFFIX=${SPLIT_DIR[$LAST_INDEX]}
-IFS=""
+DIRECTORY_SUFFIX="$(basename -s "" "$(pwd)")"
 
 COMMIT=`git rev-parse HEAD`
 if SYMBOLIC_REF=`git symbolic-ref -q --short HEAD`
