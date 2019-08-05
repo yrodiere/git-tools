@@ -23,11 +23,8 @@ source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 
 #the cloned repo will live in DIRECTORY_ROOT/REPO_DIRECTORY/CURRENT_COMMITID
 #cleanup is not performed: personally I mount a ram directory on /tmp
-DIRECTORY_ROOT=$(git config 'build.root')
-if [ -z "$DIRECTORY_ROOT" ]
-then
-	DIRECTORY_ROOT="/tmp/privatebuild/"
-fi
+DIRECTORY_ROOT=$(git config 'build.root') \
+	|| DIRECTORY_ROOT="/tmp/privatebuild/"
 
 #get the last part of the directory name
 IFS="/"
