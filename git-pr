@@ -54,7 +54,7 @@ or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 	then
 		JIRA_TICKET_KEYS_STRING="$(git log "$UPSTREAM_HEAD_BRANCH..$FORK_BRANCH" --format="%s" | git jira extract-ticket-keys 2>/dev/null || true)"
 		JIRA_TICKET_KEYS=( $JIRA_TICKET_KEYS_STRING )
-		if (( ${#JIRA_TICKET_KEYS[@]} < 0 || 5 < ${#JIRA_TICKET_KEYS[@]} ))
+		if (( ${#JIRA_TICKET_KEYS[@]} < 0 || 20 < ${#JIRA_TICKET_KEYS[@]} ))
 		then
 			log "WARNING: Failed to detect JIRA tickets from commit messages. Defaulting to detecting the JIRA ticket from the branch name."
 			BRANCH_JIRA_TICKET_KEY="${JIRA_INFO[1]}"
