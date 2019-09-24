@@ -97,7 +97,7 @@ elif [ "$1" = 'upstream.url.http' ]
 then
 	shift
 	(( $# == 0 )) || usage
-	git remote get-url "$UPSTREAM_REMOTE" | sed -r 's,^git@github.com:(.*)\.git$,https://github.com/\1,'
+	git remote get-url "$UPSTREAM_REMOTE" | sed -r 's,^(git@github.com:|https://github.com/)(.*)\.git$,https://github.com/\2,'
 elif [ "$1" = 'upstream.branch.head' ]
 then
 	shift
