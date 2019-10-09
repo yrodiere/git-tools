@@ -21,6 +21,15 @@
 
 source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 
+function usage() {
+        log "Usage:"
+        log -e "\tgit-build"
+        log -e "OR"
+        log -e "\tgit-build <executable> [<argument>...]"
+        log -e "OR"
+        log -e "\tgit-build <bash command string>"
+}
+
 SOURCE_DIRECTORY="$(pwd)"
 
 #the cloned repo will live in DIRECTORY_ROOT/REPO_DIRECTORY/CURRENT_COMMITID
@@ -39,6 +48,22 @@ else
 	READABLE_REF="$COMMIT"
 fi
 DIRECTORY="${DIRECTORY_ROOT}${DIRECTORY_SUFFIX}/${COMMIT}"
+
+while getopts 'h' opt
+do
+        case "$opt" in
+		"h")
+			usage
+			success			
+			;;
+                \?)
+			usage
+			abort
+			;;
+        esac
+done
+
+shift $(( OPTIND - 1 ))
 
 #fresh clone
 rm -Rf $DIRECTORY
