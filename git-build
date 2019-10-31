@@ -30,6 +30,18 @@ function usage() {
         log -e "\tgit-build <bash command string>"
 }
 
+function notify() {
+	if [ `uname -s` == "Darwin" ]; then
+		# On Mac OS, notify via Growl
+		which -s growlnotify 1>/dev/null && growlnotify --name Maven --sticky --message "$2: $1"
+	fi
+	if [ `uname -s` == "Linux" ]; then
+		# On Linux, notify via notify-send
+		which notify-send 1>/dev/null && notify-send "$1" "$2"
+	fi
+}
+
+
 function display_build_info() {
 	log ""
 	log "***** Build info ***********************"
@@ -91,17 +103,6 @@ fi
 
 display_build_info
 
-say() {
-	if [ `uname -s` == "Darwin" ]; then
-		# On Mac OS, notify via Growl
-		which -s growlnotify 1>/dev/null && growlnotify --name Maven --sticky --message "$2: $1"
-	fi
-	if [ `uname -s` == "Linux" ]; then
-		# On Linux, notify via notify-send
-		which notify-send 1>/dev/null && notify-send "$1" "$2"
-	fi
-}
-
 # Make sure the following commands won't abort the script if they fail,
 # which is the default behavior with the lib/common.sh import at the top of this script.
 set +o errexit
@@ -124,10 +125,10 @@ NOTIFICATION_TITLE="git-build '$READABLE_REF' from '$SOURCE_DIRECTORY'"
 if (( $RESULT == 0 ))
 then
 	NOTIFICATION_BODY="SUCCESS"
-	say "$NOTIFICATION_TITLE" "$NOTIFICATION_BODY"
+	notify "$NOTIFICATION_TITLE" "$NOTIFICATION_BODY"
 	success "$NOTIFICATION_TITLE: $NOTIFICATION_BODY"
 else
 	NOTIFICATION_BODY="FAILURE"
-	say "$NOTIFICATION_TITLE" "$NOTIFICATION_BODY"
+	notify "$NOTIFICATION_TITLE" "$NOTIFICATION_BODY"
 	abort "$NOTIFICATION_TITLE: $NOTIFICATION_BODY"
 fi
