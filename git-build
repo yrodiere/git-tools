@@ -30,6 +30,17 @@ function usage() {
         log -e "\tgit-build <bash command string>"
 }
 
+function display_build_info() {
+	log ""
+	log "***** Build info ***********************"
+	log "Source directory:   $SOURCE_DIRECTORY"
+	log "Source ref:         $READABLE_REF"
+	log "Build directory:    $DIRECTORY"
+	log "****************************************"
+	log ""
+}
+
+
 SOURCE_DIRECTORY="$(pwd)"
 
 #the cloned repo will live in DIRECTORY_ROOT/REPO_DIRECTORY/CURRENT_COMMITID
@@ -78,10 +89,7 @@ else
 	git checkout $COMMIT
 fi
 
-log ""
-log "***** Working on ref $READABLE_REF *****"
-log ""
-log ""
+display_build_info
 
 say() {
 	if [ `uname -s` == "Darwin" ]; then
@@ -109,6 +117,8 @@ else
 fi
 
 RESULT=$?
+
+display_build_info
 
 NOTIFICATION_TITLE="git-build '$READABLE_REF' from '$SOURCE_DIRECTORY'"
 if (( $RESULT == 0 ))
