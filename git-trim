@@ -30,35 +30,35 @@ function is_fixed() {
 	esac
 }
 
-function delete_local_and_remote_branch() {
-	local BRANCH_NAME
-	BRANCH_NAME="$1"
-	local UPSTREAM
-	UPSTREAM=$(git for-each-ref --format='%(upstream:short)' "refs/heads/$BRANCH_NAME")
-	if [[ "$UPSTREAM" =~ ^"$TRIM_REMOTE/" ]]
-	then
-		local UPSTREAM_BRANCH
-		UPSTREAM_BRANCH=$(echo "$UPSTREAM" | cut -d'/' -f 2)
-		git push --delete "$TRIM_REMOTE" "$UPSTREAM_BRANCH" \
-			|| log "Deleting '$UPSTREAM_BRANCH' on '$TRIM_REMOTE' failed, probably because the branch no longer exists. Ignoring."
-	fi
-	git branch -D "$BRANCH_NAME"
-}
+function delete_local_and_remote_branches() {
+	declare -a local_branch_names
+	declare -a upstream_branch_names
 
-function trim_jira_if_necessary() {
-	while read BRANCH_NAME TICKET_KEY TARGET_BRANCH
+	while read branch_name
 	do
-		TICKET_URL=$(git jira url "$TICKET_KEY")
-		RESOLUTION=$(git jira resolution "$TICKET_KEY" 2>/dev/null || true)
-		log -n "Branch '$BRANCH_NAME' refers to ticket '$TICKET_URL' with resolution '$RESOLUTION'. "
-		if is_fixed "$RESOLUTION"
+		local_branch_names+=("$branch_name")
+		local upstream
+		upstream=$(git for-each-ref --format='%(upstream:short)' "refs/heads/$branch_name")
+		if [[ "$upstream" =~ ^"$TRIM_REMOTE/" ]]
 		then
-			log "Deleting."
-			delete_local_and_remote_branch "$BRANCH_NAME"
-		else
-			log "Skipping."
+			upstream_branch_names+=("$(echo "$upstream" | cut -d'/' -f 2)")
 		fi
 	done
+
+	if (( ${#local_branch_names[*]} == 0 ))
+	then
+		log "Nothing to delete."
+		return
+	fi
+
+	log "Will delete upstream branches '${upstream_branch_names[*]}'."
+	git push --delete "$TRIM_REMOTE" "${upstream_branch_names[@]}" \
+		|| log "Deleting upstream branches on '$TRIM_REMOTE' failed, probably because a branch no longer exists. Ignoring."
+	log "Done."
+
+	log "Will delete local branches ${local_branch_names[*]}."
+	git branch -D "${local_branch_names[@]}"
+	log "Done."
 }
 
 # Automatically clean up an old configuration property
@@ -71,7 +71,20 @@ then
 
 	TRIM_REMOTE=$(git fork get remote)
 
-	git for-each-ref --format='%(refname:short)' refs/heads/ | git jira translate-branch-name | trim_jira_if_necessary
+	git for-each-ref --format='%(refname:short)' refs/heads/ | git jira info-from-branch-name \
+		| jq -r '[.branch, .key, .resolution] | @tsv' \
+		| while IFS=$'\t' read BRANCH_NAME TICKET_KEY RESOLUTION
+		do
+			TICKET_URL=$(git jira url "$TICKET_KEY")
+			log -n "Branch '$BRANCH_NAME' refers to ticket '$TICKET_URL' with resolution '$RESOLUTION'. "
+			if is_fixed "$RESOLUTION"
+			then
+				log "Deleting."
+				echo "$BRANCH_NAME"
+			else
+				log "Skipping."
+			fi
+		done | delete_local_and_remote_branches
 elif [ "$1" = 'pr' ]
 then
 	shift
@@ -97,8 +110,8 @@ then
 	do
 		LOCAL_BRANCH=$(echo "$LINE" | cut -d':' -f 1)
 		log "Branch '$LOCAL_BRANCH' has been merged into '$UPSTREAM_HEAD'. Deleting."
-		delete_local_and_remote_branch "$LOCAL_BRANCH"
-	done
+		echo "$LOCAL_BRANCH"
+	done | delete_local_and_remote_branches
 elif [ "$1" = 'list' ]
 then
 	shift
@@ -108,9 +121,9 @@ then
 
 	for BRANCH_NAME in "${@}"
 	do
-		log "Deleting branch '$BRANCH_NAME'."
-		delete_local_and_remote_branch "$BRANCH_NAME"
-	done
+		log "Will delete branch '$BRANCH_NAME'."
+		echo "$BRANCH_NAME"
+	done | delete_local_and_remote_branches
 else
 	usage
 fi

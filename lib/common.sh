@@ -3,6 +3,8 @@
 set -o errexit
 set -o pipefail
 
+CMD_JQ=$(which jq)
+
 function log() {
         echo 1>&2 "${@}"
 }
@@ -18,8 +20,19 @@ function success() {
         exit 0
 }
 
-function urlencode() {
-        which jq 1>/dev/null || abort "You must install the JSON parsing utility 'jq' first."
-        jq -s -R -r @uri
+function join_by {
+        local IFS="$1"
+        shift
+        echo "$*"
 }
+
+function jq() {
+	test -n "$CMD_JQ" || abort "You must install the JSON parsing utility 'jq' first."
+        $CMD_JQ -e "${@}"
+}
+
+function urlencode() {
+	jq -s -R -r '@uri'
+}
+
 
