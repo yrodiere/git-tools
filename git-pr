@@ -102,20 +102,25 @@ function build_title_and_body() {
 	local JIRA_TICKET_KEYS_FOR_TITLE="$(echo "${@}" | sed -E 's/(\n|\s)+/ + /g')"
 	if [ "$UPSTREAM_HEAD_BRANCH" = "$UPSTREAM_DEFAULT_HEAD_BRANCH" ]
 	then
-		TITLE=$(echo "${JIRA_TICKET_KEYS_FOR_TITLE[*]} $MAIN_JIRA_TICKET_SUMMARY" | urlencode)
+		TITLE="$(echo "${JIRA_TICKET_KEYS_FOR_TITLE[*]} $MAIN_JIRA_TICKET_SUMMARY")"
 	else
-		TITLE=$(echo "Backport ${JIRA_TICKET_KEYS_FOR_TITLE[*]} to branch $UPSTREAM_HEAD_BRANCH - $MAIN_JIRA_TICKET_SUMMARY" | urlencode)
+		TITLE="$(echo "Backport ${JIRA_TICKET_KEYS_FOR_TITLE[*]} to branch $UPSTREAM_HEAD_BRANCH - $MAIN_JIRA_TICKET_SUMMARY")"
 	fi
 
 	local BODY
 	if (( $# == 1 ))
 	then
-		BODY=$(git jira url "$1" | urlencode)
+		BODY="$(git jira url "$1")"
 	else
-		BODY=$(echo "$TICKET_LIST" | urlencode)
+		BODY="$TICKET_LIST"
 	fi
+
+	log "PR title:"
+	log "$TITLE"
+	log "PR body:"
+	log "$BODY"
 	
-	echo "title=$TITLE&body=$BODY"
+	echo "title=$(echo "$TITLE" | urlencode)&body=$(echo "$BODY" | urlencode)"
 }
 
 function get_pr() {
