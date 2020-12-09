@@ -81,7 +81,7 @@ then
 	shift
 	git log "$REVISION" --format="%D" --decorate=full --decorate-refs='refs/remotes/'$UPSTREAM_REMOTE'/*' --decorate-refs='refs/heads/*' \
 		| grep -v '^$' | sed -E 's/, /\n/g' \
-		| sed -E 's,^refs/remotes/'$UPSTRAM_REMOTE'upstream/(.*),\1,;t;s,^refs/heads/(master|[[:digit:]]+.[[:digit:]]+),\1,;t;d' \
+		| sed -E 's,^refs/remotes/'$UPSTRAM_REMOTE'upstream/(.*),\1,;t;s,^refs/heads/(master|main|[[:digit:]]+.[[:digit:]]+),\1,;t;d' \
 		| head -n 1
 	success
 else
