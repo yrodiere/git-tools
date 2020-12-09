@@ -1,0 +1,20 @@
+#!/bin/bash
+
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
+
+function usage() {
+        log "Usage:"
+        log -e "\tgit authors list [<rev-range>]"
+        abort
+}
+
+
+if [ "$1" = 'list' ]
+then
+	shift
+	git log "${@}" --format="%aN <%aE>" --reverse | perl -e 'my %dedupe; while (<STDIN>) { print unless $dedupe{$_}++}'
+else
+        usage
+fi
+
+
