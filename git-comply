@@ -1,0 +1,67 @@
+#!/bin/bash
+# git-comply: comply with naming requirements for the main branch.
+
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
+
+function usage() {
+        log "Usage:"
+        log -e "\tgit comply <remote>"
+        abort
+}
+
+if [ "$#" == '1' ]
+then
+	REMOTE="$1"
+	shift
+else
+	usage
+fi
+
+if ! git show-ref | cut -f 2 -d ' ' | grep refs/heads/master 1>/dev/null
+then
+	log "No local branch named 'master'"
+	abort
+fi
+
+USER=$(git remote get-url "$REMOTE" | sed -r 's,^git@github.com:([^/]+)/.*\.git$,\1,;s,^https://github.com/([^/]+)/.*$,\1,')
+REPO=$(git remote get-url "$REMOTE" | sed -r 's,^git@github.com:[^/]+/([^/]+).*\.git$,\1,;s,^https://github.com/[^/]+/([^/]+).*$,\1,')
+
+log "Switching to branch 'master'..."
+git switch master
+
+log
+log "Pulling lastest changes..."
+git pull
+
+log
+log "Renaming branch 'master' to 'main' in local clone..."
+git branch -m master main
+
+log
+log "Copying branch 'master' to 'main' in remote repository $USER/$REPO..."
+git push "$REMOTE" main:main
+
+log
+log "Setting upstream branch to 'main'..."
+git branch --set-upstream-to "$REMOTE/main"
+
+URL="https://github.com/$USER/$REPO/settings/branches"
+log
+log "Opening $URL..."
+xdg-open "$URL"
+
+log
+log "Change the default branch to 'main'."
+read -p "Press any key to continue..."
+
+log
+log "Move any protection from branch 'master' to 'main'."
+read -p "Press any key to resume..."
+
+log
+log "Deleting branch 'master' in remote repository $USER/$REPO..."
+git push "$REMOTE" --delete master
+
+log
+success "Done!"
+
