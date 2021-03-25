@@ -79,9 +79,30 @@ then
 	(( $# == 1 )) || usage
 	REVISION="$1"
 	shift
+	AWK_SCRIPT=$(cat <<END_SCRIPT
+{
+	# A single commit in the log can match multiple refs
+	# We need to pick one
+	split(\$0,refs,", ");
+	winner = ""
+	for (i in refs) {
+		ref = refs[i]
+		ref = gensub("^refs/remotes/$UPSTREAM_REMOTE/(.*)","\\\\1","g",ref)
+		ref = gensub("^refs/heads/(master|main|[[:digit:]]+.[[:digit:]]+)","\\\\1","g",ref)
+		# Only consider matching refs
+		# ref "main"/"master" always wins
+		if (ref != refs[i] && winner != "main" && winner != "master") {
+			winner = ref
+		}
+	}
+	print winner
+}
+END_SCRIPT
+)
 	git log "$REVISION" --format="%D" --decorate=full --decorate-refs='refs/remotes/'$UPSTREAM_REMOTE'/*' --decorate-refs='refs/heads/*' \
-		| grep -v '^$' | sed -E 's/, /\n/g' \
-		| sed -E 's,^refs/remotes/'$UPSTRAM_REMOTE'upstream/(.*),\1,;t;s,^refs/heads/(master|main|[[:digit:]]+.[[:digit:]]+),\1,;t;d' \
+		| grep -v '^$' \
+		| awk "$AWK_SCRIPT" \
+		| grep -v '^$' \
 		| head -n 1
 	success
 else
