@@ -35,12 +35,26 @@ function convert_legacy() {
 		&& echo "$LEGACY_VALUE"
 }
 
-if [ "$1" = 'setup' ]
-then
-	shift
+function setup() {
 	(( $# == 2 )) && [ -n "$1" -a -n "$2" ] || usage
 	git config --local fork.upstream.remote "$1"
 	git config --local fork.remote "$2"
+}
+
+function autosetup() {
+	
+	LEGACY_VALUE=$(git config --local "$1") \
+		&& log "Moving legacy configuration option '$1' to '$2'..." \
+		&& git config --local "$2" "$LEGACY_VALUE" \
+		&& git config --local --unset "$1" \
+		&& echo "$LEGACY_VALUE"
+}
+
+
+if [ "$1" = 'setup' ]
+then
+	shift
+	setup "${@}"
 	success "Successfully set the upstream remote ('$1') and the fork remote ('$2')."
 elif [ "$1" = 'purge' ]
 then
@@ -54,11 +68,26 @@ then
 fi
 
 UPSTREAM_REMOTE=$(git config --local fork.upstream.remote \
-	|| convert_legacy sync.fork.upstream.remote fork.upstream.remote) \
-	|| abort "Use 'git fork setup <upstream-remote> <fork-remote>' first."
+	|| convert_legacy sync.fork.upstream.remote fork.upstream.remote \
+	|| true)
 FORK_REMOTE=$(git config --local fork.remote \
-	|| convert_legacy sync.fork.remote fork.remote) \
-	|| abort "Use 'git fork setup <upstream-remote> <fork-remote>' first."
+	|| convert_legacy sync.fork.remote fork.remote \
+	|| true)
+
+if [ -z "$UPSTREAM_REMOTE" -o -z "$FORK_REMOTE" ]
+then
+	if git remote | grep -E '^origin$' 1>/dev/null 2>&1 \
+		&& git remote | grep -E '^upstream$' 1>/dev/null 2>&1
+	then
+		UPSTREAM_REMOTE=upstream
+		FORK_REMOTE=origin
+		log "Automatically setting up the upstream remote ('$UPSTREAM_REMOTE') and the fork remote ('$FORK_REMOTE')."
+		setup "$UPSTREAM_REMOTE" "$FORK_REMOTE"
+	else
+		abort "Use 'git fork setup <upstream-remote> <fork-remote>' first."
+	fi
+fi
+
 
 if [ "$1" = 'get' ]
 then
