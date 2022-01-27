@@ -30,9 +30,13 @@ function is_fixed() {
 	esac
 }
 
+function branch_name_relative_to() {
+	echo ${1/#$2\//}
+}
+
 function delete_local_and_remote_branches() {
 	declare -a local_branch_names
-	declare -a upstream_branch_names
+	declare -a remote_branch_names
 
 	while read branch_name
 	do
@@ -41,7 +45,7 @@ function delete_local_and_remote_branches() {
 		upstream=$(git for-each-ref --format='%(upstream:short)' "refs/heads/$branch_name")
 		if [[ "$upstream" =~ ^"$TRIM_REMOTE/" ]]
 		then
-			upstream_branch_names+=("$(echo "$upstream" | cut -d'/' -f 2)")
+			remote_branch_names+=("$(branch_name_relative_to "$upstream" "$TRIM_REMOTE")")
 		fi
 	done
 
@@ -51,13 +55,39 @@ function delete_local_and_remote_branches() {
 		return
 	fi
 
-	log "Will delete upstream branches '${upstream_branch_names[*]}'."
-	git push --delete "$TRIM_REMOTE" "${upstream_branch_names[@]}" \
-		|| log "Deleting upstream branches on '$TRIM_REMOTE' failed, probably because a branch no longer exists. Ignoring."
-	log "Done."
+	if (( ${#remote_branch_names[*]} > 0 ))
+	then
+		log "Will delete remote fork branches '${remote_branch_names[*]}'."
+		git push --delete "$TRIM_REMOTE" "${remote_branch_names[@]}" \
+			|| log "Deleting remote fork branches on '$TRIM_REMOTE' failed, probably because a branch no longer exists. Ignoring."
+		log "Done."
+	fi
 
 	log "Will delete local branches ${local_branch_names[*]}."
 	git branch -D "${local_branch_names[@]}"
+	log "Done."
+}
+
+function delete_remote_branches() {
+	declare -a remote_branch_names
+
+	while read upstream
+	do
+		if [[ "$upstream" =~ ^"$TRIM_REMOTE/" ]]
+		then
+			remote_branch_names+=("$(branch_name_relative_to "$upstream" "$TRIM_REMOTE")")
+		fi
+	done
+
+	if (( ${#remote_branch_names[*]} == 0 ))
+	then
+		log "Nothing to delete."
+		return
+	fi
+
+	log "Will delete remote fork branches '${remote_branch_names[*]}'."
+	git push --delete "$TRIM_REMOTE" "${remote_branch_names[@]}" \
+		|| log "Deleting remote fork branches on '$TRIM_REMOTE' failed, probably because a branch no longer exists. Ignoring."
 	log "Done."
 }
 
@@ -71,12 +101,13 @@ then
 
 	TRIM_REMOTE=$(git fork get remote)
 
+	log "Checking local branches..."
 	git for-each-ref --format='%(refname:short)' refs/heads/ | git jira info-from-branch-name \
 		| jq -r '[.branch, .key, .resolution] | @tsv' \
 		| while IFS=$'\t' read BRANCH_NAME TICKET_KEY RESOLUTION
 		do
 			TICKET_URL=$(git jira url "$TICKET_KEY")
-			log -n "Branch '$BRANCH_NAME' refers to ticket '$TICKET_URL' with resolution '$RESOLUTION'. "
+			log -n "Local branch '$BRANCH_NAME' refers to ticket '$TICKET_URL' with resolution '$RESOLUTION'. "
 			if is_fixed "$RESOLUTION"
 			then
 				log "Deleting."
@@ -85,6 +116,23 @@ then
 				log "Skipping."
 			fi
 		done | delete_local_and_remote_branches
+
+	log "Checking remote fork branches..."
+	git for-each-ref --format='%(refname:lstrip=3)' "refs/remotes/$TRIM_REMOTE" | git jira info-from-branch-name \
+		| jq -r '[.branch, .key, .resolution] | @tsv' \
+		| while IFS=$'\t' read BRANCH_NAME TICKET_KEY RESOLUTION
+		do
+			TICKET_URL=$(git jira url "$TICKET_KEY")
+			REMOTE_BRANCH="$TRIM_REMOTE/$BRANCH_NAME"
+			log -n "Remote fork branch '$REMOTE_BRANCH' refers to ticket '$TICKET_URL' with resolution '$RESOLUTION'. "
+			if is_fixed "$RESOLUTION"
+			then
+				log "Deleting."
+				echo "$REMOTE_BRANCH"
+			else
+				log "Skipping."
+			fi
+		done | delete_remote_branches
 elif [ "$1" = 'pr' ]
 then
 	shift
@@ -94,7 +142,7 @@ then
 	do
 		LOCAL_BRANCH=$(echo "$LINE" | cut -d':' -f 1)
 		UPSTREAM_BRANCH=$(echo "$LINE" | cut -d':' -f 2)
-		log "Branch '$LOCAL_BRANCH' is tracking the remote branch '$UPSTREAM_BRANCH', which is on a contributor's remote. Deleting."
+		log "Local branch '$LOCAL_BRANCH' is tracking the remote branch '$UPSTREAM_BRANCH', which is on a contributor's remote. Deleting."
 		git branch -D "$LOCAL_BRANCH"
 	done
 elif [ "$1" = 'merged' ]
@@ -106,12 +154,22 @@ then
 	UPSTREAM_REMOTE=$(git fork get upstream.remote)
 	UPSTREAM_HEAD=$(git fork get upstream.branch.head)
 
+	log "Checking local branches..."
 	for LINE in $(git branch --merged "$UPSTREAM_HEAD" --format='%(refname:short):%(upstream:short)' | grep -P -v ":\Q$UPSTREAM_REMOTE\E/")
 	do
 		LOCAL_BRANCH=$(echo "$LINE" | cut -d':' -f 1)
-		log "Branch '$LOCAL_BRANCH' has been merged into '$UPSTREAM_HEAD'. Deleting."
+		log "Local branch '$LOCAL_BRANCH' has been merged into '$UPSTREAM_HEAD'. Deleting."
 		echo "$LOCAL_BRANCH"
 	done | delete_local_and_remote_branches
+
+	log "Checking remote fork branches..."
+	UPSTREAM_HEAD_RELATIVE=${UPSTREAM_HEAD/#${UPSTREAM_REMOTE}\//}
+	for FORK_BRANCH in $(git branch -r --merged "$UPSTREAM_HEAD" --format='%(refname:short)' | grep -P "^\Q${TRIM_REMOTE}/\E" \
+		| grep -P -v "^\Q$TRIM_REMOTE/$UPSTREAM_HEAD_RELATIVE\E$")
+	do
+		log "Remote fork branch '$FORK_BRANCH' has been merged into '$UPSTREAM_HEAD'. Deleting."
+		echo "$FORK_BRANCH"
+	done | delete_remote_branches
 elif [ "$1" = 'list' ]
 then
 	shift
@@ -119,12 +177,39 @@ then
 
 	TRIM_REMOTE=$(git fork get remote)
 
+	declare -a local_branch_names
+	declare -a remote_branch_names
+
 	for BRANCH_NAME in "${@}"
 	do
-		log "Will delete branch '$BRANCH_NAME'."
-		echo "$BRANCH_NAME"
-	done | delete_local_and_remote_branches
+		if git rev-parse --verify -q --abbrev-ref "refs/heads/$BRANCH_NAME"
+		then
+			log "Interpreting '$BRANCH_NAME' as local branch '$BRANCH_NAME'."
+			local_branch_names+=("$BRANCH_NAME")
+		elif git rev-parse --verify -q --abbrev-ref "refs/remotes/$TRIM_REMOTE/$BRANCH_NAME"
+		then
+			REMOTE_BRANCH="$TRIM_REMOTE/$BRANCH_NAME"
+			log "Interpreting '$BRANCH_NAME' as remote fork branch '$REMOTE_BRANCH'."
+			remote_branch_names+=("$REMOTE_BRANCH")
+		else
+			log "Ignoring unknown branch '$BRANCH_NAME'."
+		fi
+	done
+
+	if (( ${#local_branch_names[*]} == 0 )) && (( ${#remote_branch_names[*]} == 0 ))
+	then
+		log "Nothing to delete."
+		abort
+	fi
+
+	if (( ${#local_branch_names[*]} > 0 ))
+	then
+		echo "${local_branch_names[@]}" | delete_local_and_remote_branches
+	fi
+	if (( ${#remote_branch_names[*]} > 0 ))
+	then
+		echo "${remote_branch_names[@]}" | delete_remote_branches
+	fi
 else
 	usage
 fi
-
