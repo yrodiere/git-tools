@@ -3,6 +3,10 @@
 *.autosave
 *.swp
 
+# IDE
+.idea
+*.iml
+
 # Miscellaneous
 *.log
 .clover
