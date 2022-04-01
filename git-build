@@ -48,6 +48,7 @@ function display_build_info() {
 	log "Source directory:   $SOURCE_DIRECTORY"
 	log "Source ref:         $READABLE_REF"
 	log "Build directory:    $DIRECTORY"
+	log "Build command:      ${BUILD_COMMAND[@]}"
 	log "****************************************"
 	log ""
 }
@@ -87,6 +88,8 @@ do
 done
 
 shift $(( OPTIND - 1 ))
+BUILD_COMMAND=("$@")
+shift $#
 
 #fresh clone
 rm -Rf $DIRECTORY
@@ -101,21 +104,23 @@ else
 	git checkout $COMMIT
 fi
 
+# Allow for parameters to override the build command for this project:
+if [[ ${#BUILD_COMMAND[@]} -eq 0 ]]; then 
+	if [ -e "pom.xml" ]; then
+		# For Maven projects we can assume a default:
+		BUILD_COMMAND=("mvn clean install")
+	else
+		abort "Build command must be provided as parameters for non-maven projects. No pom.xml detected."
+	fi
+fi
+
 display_build_info
 
 # Make sure the following commands won't abort the script if they fail,
 # which is the default behavior with the lib/common.sh import at the top of this script.
 set +o errexit
 
-# Allow for parameters to override the build command for this project:
-if [[ $# -ne 0 ]]; then 
-	eval "${@}"
-elif [ -e "pom.xml" ]; then
-	# For Maven projects we can assume a default:
-	mvn clean install
-else
-	abort "Build command must be provided as parameters for non-maven projects. No pom.xml detected."
-fi
+eval "${BUILD_COMMAND[@]}"
 
 RESULT=$?
 
