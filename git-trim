@@ -204,11 +204,11 @@ then
 
 	if (( ${#local_branch_names[*]} > 0 ))
 	then
-		echo "${local_branch_names[@]}" | delete_local_and_remote_branches
+		echo "${local_branch_names[@]}" | xargs -n 1 echo | delete_local_and_remote_branches
 	fi
 	if (( ${#remote_branch_names[*]} > 0 ))
 	then
-		echo "${remote_branch_names[@]}" | delete_remote_branches
+		echo "${remote_branch_names[@]}" | xargs -n 1 echo | delete_remote_branches
 	fi
 else
 	usage
