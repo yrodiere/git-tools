@@ -86,7 +86,7 @@ elif [ "$1" = 'extract-ticket-keys' ]
 then
 	shift
 	(( $# == 0 )) || usage
-	sed -E 's/^\[?('"$PROJECT_KEY"'-[[:digit:]]+)\]? .*/\1/;t;d;' | sort -u
+	sed -E 's/^\[?('"$PROJECT_KEY"'-[[:digit:]]+)\]?.*/\1/;t;d;' | sort -u
 else
 	usage
 fi
