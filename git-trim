@@ -34,6 +34,12 @@ function branch_name_relative_to() {
 	echo ${1/#$2\//}
 }
 
+function fetch_trim_remote() {
+	log "Fetching remote $TRIM_REMOTE..."
+	git fetch --prune "$TRIM_REMOTE"
+	log "Done."
+}
+
 function delete_local_and_remote_branches() {
 	declare -a local_branch_names
 	declare -a remote_branch_names
@@ -61,6 +67,7 @@ function delete_local_and_remote_branches() {
 		git push --delete "$TRIM_REMOTE" "${remote_branch_names[@]}" \
 			|| log "Deleting remote fork branches on '$TRIM_REMOTE' failed, probably because a branch no longer exists. Ignoring."
 		log "Done."
+		fetch_trim_remote
 	fi
 
 	log "Will delete local branches ${local_branch_names[*]}."
@@ -89,6 +96,7 @@ function delete_remote_branches() {
 	git push --delete "$TRIM_REMOTE" "${remote_branch_names[@]}" \
 		|| log "Deleting remote fork branches on '$TRIM_REMOTE' failed, probably because a branch no longer exists. Ignoring."
 	log "Done."
+	fetch_trim_remote
 }
 
 # Automatically clean up an old configuration property
@@ -100,6 +108,7 @@ then
 	(( $# == 0 )) || usage
 
 	TRIM_REMOTE=$(git fork get remote)
+	fetch_trim_remote
 
 	log "Checking local branches..."
 	git for-each-ref --format='%(refname:short)' refs/heads/ | git jira info-from-branch-name \
@@ -151,6 +160,8 @@ then
 	(( $# == 0 )) || usage
 
 	TRIM_REMOTE=$(git fork get remote)
+	fetch_trim_remote
+
 	UPSTREAM_REMOTE=$(git fork get upstream.remote)
 	UPSTREAM_HEAD=$(git fork get upstream.branch.head)
 
@@ -176,6 +187,7 @@ then
 	(( $# >= 1 )) || usage
 
 	TRIM_REMOTE=$(git fork get remote)
+	fetch_trim_remote
 
 	declare -a local_branch_names
 	declare -a remote_branch_names
