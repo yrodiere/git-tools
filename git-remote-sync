@@ -10,9 +10,9 @@ TARGET="$2"
 git fetch --multiple -q -p "$SOURCE" "$TARGET"
 
 PUSHED_REFS=$(git for-each-ref "refs/remotes/$SOURCE/" --format '%(refname):refs/heads/%(refname:strip=3)' | grep -v ':refs/heads/HEAD$')
-git push --dry-run "$TARGET" $PUSHED_REFS
+git push --force-with-lease --dry-run "$TARGET" $PUSHED_REFS
 
 read -p 'OK with that? [y/N] '
 [ "$REPLY" = 'y' ] || abort
 
-git push "$TARGET" $PUSHED_REFS
+git push --force-with-lease "$TARGET" $PUSHED_REFS
