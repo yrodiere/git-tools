@@ -1,0 +1,20 @@
+#!/bin/bash
+
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
+
+function usage() {
+        log "Usage:"
+        log -e "\tgit large-commits [<rev>]"
+        abort
+}
+
+
+if (( $# <= 1 ))
+then
+	REV="${1:-HEAD}"
+	git log --color --oneline --shortstat --no-abbrev-commit "$REV" | grep -E -B 1 '([1-9][0-9]|[5-9])[0-9]{2} files' | less
+else
+        usage
+fi
+
+
