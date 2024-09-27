@@ -19,6 +19,8 @@ function usage() {
 	log -e "OR"
 	log -e "\tgit fork get remote"
 	log -e "OR"
+	log -e "\tgit fork get url.http"
+	log -e "OR"
 	log -e "\tgit fork get user.name"
 	log -e "OR"
 	log -e "\tgit fork branch init"
@@ -48,6 +50,10 @@ function autosetup() {
 		&& git config --local "$2" "$LEGACY_VALUE" \
 		&& git config --local --unset "$1" \
 		&& echo "$LEGACY_VALUE"
+}
+
+function git_url_to_http() {
+	sed -r 's,^(git@([^:]+):|https://([^/]+)/?)(.*)\.git$,https://\2\3/\4,'
 }
 
 
@@ -147,7 +153,7 @@ elif [ "$1" = 'upstream.url.http' ]
 then
 	shift
 	(( $# == 0 )) || usage
-	git remote get-url "$UPSTREAM_REMOTE" | sed -r 's,^(git@github.com:|https://github.com/)(.*)\.git$,https://github.com/\2,'
+	git remote get-url "$UPSTREAM_REMOTE" | git_url_to_http
 elif [ "$1" = 'upstream.branch.head' ]
 then
 	shift
@@ -174,6 +180,11 @@ then
 	shift
 	(( $# == 0 )) || usage
 	echo "$FORK_REMOTE"
+elif [ "$1" = 'url.http' ]
+then
+	shift
+	(( $# == 0 )) || usage
+	git remote get-url "$FORK_REMOTE" | git_url_to_http
 elif [ "$1" = 'user.name' ]
 then
 	shift

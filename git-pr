@@ -49,6 +49,7 @@ or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 		fi
 	fi
 
+	log "Source: $FORK_BRANCH; target: $UPSTREAM_HEAD_BRANCH"
 	local JIRA_TICKET_KEYS=( $2 )
 	if (( ${#JIRA_TICKET_KEYS[@]} == 0 ))
 	then
@@ -74,7 +75,15 @@ or because git-jira is not set up). The PR title and text won't be populated aut
 	local FORK_USERNAME
 	FORK_USERNAME="$(git fork get user.name)"
 
-	PR_CREATE_URL="$UPSTREAM_URL/compare/$UPSTREAM_HEAD_BRANCH...$FORK_USERNAME:$FORK_BRANCH?expand=1"
+	if [[ "$UPSTREAM_URL" =~ ^https://[^/]*gitlab ]]
+	then
+		local FORK_URL
+		FORK_URL="$(git fork get url.http)"
+		PR_CREATE_URL="$FORK_URL/-/merge_requests/new?merge_request[source_branch]=$FORK_BRANCH&[target_branch]=$UPSTREAM_HEAD_BRANCH"
+	else
+		PR_CREATE_URL="$UPSTREAM_URL/compare/$UPSTREAM_HEAD_BRANCH...$FORK_USERNAME:$FORK_BRANCH?expand=1"
+	fi
+		
 	if (( ${#JIRA_TICKET_KEYS[@]} > 0 ))
 	then
 		PR_CREATE_URL+="&"
