@@ -17,7 +17,7 @@ then
 elif [ "$1" = "grep-javadoc" ]
 then
 	shift
-	git rev-list "${@:---all}" -- ':*.java' |
+	git log "${@}" --format='%H' -G@author -- ':*.java' |
 		xargs git grep -h @author | 
 		sed -E 's/.*@author (.*)/\1/g' |
 		sed -E 's/(\(|&lt;|<)(.*)( at |@)(.*)( dot |\.)(.*)(\)|&gt;|>)/<\2@\4.\6>/g' |
