@@ -5,6 +5,7 @@ source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 function usage() {
         log "Usage:"
         log -e "\tgit authors list [<rev-range>]"
+        log -e "\tgit authors grep-javadoc [<rev-range>]"
         abort
 }
 
@@ -13,6 +14,15 @@ if [ "$1" = 'list' ]
 then
 	shift
 	git log "${@}" --format="%aN <%aE>" --reverse | perl -e 'my %dedupe; while (<STDIN>) { print unless $dedupe{$_}++}'
+elif [ "$1" = "grep-javadoc" ]
+then
+	shift
+	git rev-list "${@:---all}" -- ':*.java' |
+		xargs git grep -h @author | 
+		sed -E 's/.*@author (.*)/\1/g' |
+		sed -E 's/(\(|&lt;|<)(.*)( at |@)(.*)( dot |\.)(.*)(\)|&gt;|>)/<\2@\4.\6>/g' |
+		sed -E 's/\([Cc]\).*//g' |
+		sort -u
 else
         usage
 fi
