@@ -20,6 +20,7 @@ then
 	git log "${@}" --format='%H' -G@author -- ':*.java' |
 		xargs git grep -h @author | 
 		sed -E 's/.*@author (.*)/\1/g' |
+		sed -E 's,<a href[^>]*>|</a>,,g' |
 		sed -E 's/(\(|&lt;|<)(.*)( at |@)(.*)( dot |\.)(.*)(\)|&gt;|>)/<\2@\4.\6>/g' |
 		sed -E 's/\([Cc]\).*//g' |
 		sort -u
