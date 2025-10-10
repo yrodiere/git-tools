@@ -27,9 +27,9 @@ function query_tickets() {
 	declare -a ticket_keys
 	readarray ticket_keys
 	# Use validateQuery: false to avoid errors when a ticket does not exist
-	curl -s -f -X POST -L -H "Content-Type: application/json" \
-		--data "{\"jql\": \"key IN ($(join_by ',' ${ticket_keys[*]}))\", \"fields\": [\"key\",\"resolution\",\"summary\"], \"maxResults\": ${#ticket_keys[@]}, \"validateQuery\": false}" \
-		"$ENDPOINT/rest/api/2/search" \
+	curl -s -f -X GET -L -H "Content-Type: application/json" \
+		-G --data-urlencode "jql=key IN ($(join_by ',' ${ticket_keys[*]}))" -d 'fields=key,resolution,summary' -d "maxResults=${#ticket_keys[@]}" \
+		"$ENDPOINT/rest/api/3/search/jql" \
 		| jq '.issues[] | {key: .key, summary: .fields.summary, resolution: .fields.resolution.name}' \
 		|| abort "Failed to retrieve some tickets in '${ticket_keys[*]}'; are they all valid ticket keys?"
 }
