@@ -189,7 +189,7 @@ elif [ "$1" = 'user.name' ]
 then
 	shift
 	(( $# == 0 )) || usage
-	git remote get-url "$FORK_REMOTE" | sed -r 's,^git@github.com:([^/]+)/.*\.git$,\1,;s,^https://github.com/([^/]+)/.*$,\1,'
+	git remote get-url "$FORK_REMOTE" | sed -r 's,^git@[^:]+:([^/]+)/.*\.git$,\1,;s,^https://[^/]+/([^/]+)/.*$,\1,'
 else
 	usage
 fi
