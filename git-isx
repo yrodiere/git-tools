@@ -42,12 +42,18 @@ function get_base_branch() {
 	echo "$BASE_BRANCH"
 }
 
-function check_remote_exists() {
-	local REMOTE_NAME="$1"
+function resolve_remote_name() {
+	local NAME="$1"
+	local GIT_DIR_NAME="$2"
 
-	if ! git remote get-url "$REMOTE_NAME" >/dev/null 2>&1
+	if git remote get-url "$NAME" >/dev/null 2>&1
 	then
-		abort "Remote '$REMOTE_NAME' does not exist. Maybe the incus-spawn instance '$REMOTE_NAME' doesn't exist?"
+		echo "$NAME"
+	elif git remote get-url "$GIT_DIR_NAME-$NAME" >/dev/null 2>&1
+	then
+		echo "$GIT_DIR_NAME-$NAME"
+	else
+		abort "No remote found for '$NAME' (tried '$NAME' and '$GIT_DIR_NAME-$NAME'). Maybe the incus-spawn instance doesn't exist?"
 	fi
 }
 
@@ -59,10 +65,7 @@ function get_branch() {
 	GIT_DIR_NAME="$(get_git_directory_name)"
 
 	local REMOTE_NAME
-	REMOTE_NAME="$GIT_DIR_NAME-$NAME"
-
-	# Check that the remote exists (created by another tool)
-	check_remote_exists "$REMOTE_NAME"
+	REMOTE_NAME="$(resolve_remote_name "$NAME" "$GIT_DIR_NAME")"
 
 	# Fetch the remote
 	log "Fetching remote '$REMOTE_NAME'..."
@@ -167,10 +170,7 @@ function put_branch() {
 	GIT_DIR_NAME="$(get_git_directory_name)"
 
 	local REMOTE_NAME
-	REMOTE_NAME="$GIT_DIR_NAME-$NAME"
-
-	# Check that the remote exists (created by another tool)
-	check_remote_exists "$REMOTE_NAME"
+	REMOTE_NAME="$(resolve_remote_name "$NAME" "$GIT_DIR_NAME")"
 
 	# Fetch the remote to ensure we have the latest state
 	log "Fetching remote '$REMOTE_NAME'..."
