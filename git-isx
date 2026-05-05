@@ -42,6 +42,19 @@ function get_base_branch() {
 	echo "$BASE_BRANCH"
 }
 
+function get_remote_default_branch() {
+	local REMOTE_NAME="$1"
+	local DEFAULT_BRANCH
+
+	if ! DEFAULT_BRANCH=$(git rev-parse --abbrev-ref "$REMOTE_NAME/HEAD" 2>/dev/null)
+	then
+		git remote set-head -a "$REMOTE_NAME" 1>&2
+		DEFAULT_BRANCH=$(git rev-parse --abbrev-ref "$REMOTE_NAME/HEAD")
+	fi
+
+	echo "${DEFAULT_BRANCH#"$REMOTE_NAME/"}"
+}
+
 function resolve_remote_name() {
 	local NAME="$1"
 	local GIT_DIR_NAME="$2"
@@ -71,7 +84,10 @@ function get_branch() {
 	log "Fetching remote '$REMOTE_NAME'..."
 	git fetch -p "$REMOTE_NAME"
 
-	if git rev-parse --quiet --verify "$BRANCH_NAME" >/dev/null 2>&1
+	local REMOTE_DEFAULT_BRANCH
+	REMOTE_DEFAULT_BRANCH="$(get_remote_default_branch "$REMOTE_NAME")"
+
+	if git rev-parse --quiet --verify "refs/heads/$BRANCH_NAME" >/dev/null 2>&1
 	then
 		# Branch exists - checkout and rebase
 		log "Branch '$BRANCH_NAME' exists locally, checking out and rebasing..."
@@ -79,15 +95,15 @@ function get_branch() {
 		git checkout "$BRANCH_NAME" \
 			|| abort "Error while checking out branch '$BRANCH_NAME'."
 
-		# Reset to the remote's main branch
-		git fetch "$REMOTE_NAME" main:refs/remotes/"$REMOTE_NAME"/main \
-			|| abort "Error fetching '$REMOTE_NAME/main'."
+		# Reset to the remote's default branch
+		git fetch "$REMOTE_NAME" "$REMOTE_DEFAULT_BRANCH":refs/remotes/"$REMOTE_NAME"/"$REMOTE_DEFAULT_BRANCH" \
+			|| abort "Error fetching '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH'."
 
-		log "Resetting to '$REMOTE_NAME/main'..."
-		git reset --hard "$REMOTE_NAME/main" \
-			|| abort "Error resetting to '$REMOTE_NAME/main'."
+		log "Resetting to '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH'..."
+		git reset --hard "$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH" \
+			|| abort "Error resetting to '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH'."
 
-		# Non-interactive rebase on main
+		# Non-interactive rebase on default branch
 		local BASE_BRANCH
 		BASE_BRANCH="$(get_base_branch)"
 
@@ -110,12 +126,12 @@ function get_branch() {
 		fi
 
 	else
-		# Branch doesn't exist - create from remote's main
-		log "Branch '$BRANCH_NAME' doesn't exist locally, creating from '$REMOTE_NAME/main'..."
+		# Branch doesn't exist - create from remote's default branch
+		log "Branch '$BRANCH_NAME' doesn't exist locally, creating from '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH'..."
 
-		# Create branch from remote's main without setting up tracking
-		git checkout -b "$BRANCH_NAME" --no-track "$REMOTE_NAME/main" \
-			|| abort "Error while creating branch '$BRANCH_NAME' from '$REMOTE_NAME/main'."
+		# Create branch from remote's default branch without setting up tracking
+		git checkout -b "$BRANCH_NAME" --no-track "$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH" \
+			|| abort "Error while creating branch '$BRANCH_NAME' from '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH'."
 
 		# Rebase on upstream/main or origin/main
 		local BASE_BRANCH
