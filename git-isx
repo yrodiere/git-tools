@@ -45,6 +45,46 @@ function get_base_branch() {
 	echo "$BASE_BRANCH"
 }
 
+function run_on_isx_remote() {
+	local REMOTE_NAME="$1"
+	local BASH_CMD="$2"
+
+	local REMOTE_URL
+	REMOTE_URL=$(git remote get-url "$REMOTE_NAME")
+
+	local ISX_PART="${REMOTE_URL#isx://}"
+	local INSTANCE="${ISX_PART%%/*}"
+	local REPO_PATH="${ISX_PART#*/}"
+	# Mirror GitRemoteUtils.expandContainerTilde: ~/... -> /home/agentuser/...
+	REPO_PATH="${REPO_PATH/#~//home/agentuser}"
+
+	incus exec "$INSTANCE" --user 1000 --cwd "/home/agentuser" -- bash -c "cd $REPO_PATH && $BASH_CMD"
+}
+
+function push_to_isx_remote() {
+	local REMOTE_NAME="$1"
+	local BRANCH_NAME="$2"
+	local REMOTE_DEFAULT_BRANCH="$3"
+
+	local LOCAL_SHA
+	LOCAL_SHA=$(git rev-parse HEAD)
+	local REMOTE_SHA
+	REMOTE_SHA=$(git rev-parse "$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH" 2>/dev/null || echo "")
+
+	if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]
+	then
+		log "Pushing to '$REMOTE_NAME/$BRANCH_NAME'..."
+		git push --force "$REMOTE_NAME" "HEAD:$BRANCH_NAME" \
+			|| abort "Error pushing to '$REMOTE_NAME/$BRANCH_NAME'."
+
+		log "Resetting '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH' to '$BRANCH_NAME'..."
+		run_on_isx_remote "$REMOTE_NAME" "git reset --hard $BRANCH_NAME" \
+			|| abort "Error resetting working tree on '$REMOTE_NAME'."
+	else
+		log "Remote '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH' is already up to date, skipping push."
+	fi
+}
+
 function get_remote_default_branch() {
 	local REMOTE_NAME="$1"
 	local DEFAULT_BRANCH
@@ -161,22 +201,7 @@ function get_branch() {
 	fi
 
 	# Push the result back to the source remote if there are changes
-	local LOCAL_SHA
-	LOCAL_SHA=$(git rev-parse HEAD)
-	local REMOTE_SHA
-	REMOTE_SHA=$(git rev-parse "$REMOTE_NAME/$BRANCH_NAME" 2>/dev/null || echo "")
-
-	if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]
-	then
-		log "Deleting remote branch '$REMOTE_NAME/$BRANCH_NAME'..."
-		git push "$REMOTE_NAME" --delete "$BRANCH_NAME" 2>/dev/null || true
-
-		log "Pushing to '$REMOTE_NAME/$BRANCH_NAME'..."
-		git push "$REMOTE_NAME" "$BRANCH_NAME" \
-			|| abort "Error pushing to '$REMOTE_NAME/$BRANCH_NAME'."
-	else
-		log "Remote branch '$REMOTE_NAME/$BRANCH_NAME' is already up to date, skipping push."
-	fi
+	push_to_isx_remote "$REMOTE_NAME" "$BRANCH_NAME" "$REMOTE_DEFAULT_BRANCH"
 
 	log "Successfully checked out and rebased branch '$BRANCH_NAME'."
 }
@@ -195,22 +220,10 @@ function put_branch() {
 	log "Fetching remote '$REMOTE_NAME'..."
 	git fetch -p "$REMOTE_NAME"
 
-	local LOCAL_SHA
-	LOCAL_SHA=$(git rev-parse HEAD)
-	local REMOTE_SHA
-	REMOTE_SHA=$(git rev-parse "$REMOTE_NAME/$BRANCH_NAME" 2>/dev/null || echo "")
+	local REMOTE_DEFAULT_BRANCH
+	REMOTE_DEFAULT_BRANCH="$(get_remote_default_branch "$REMOTE_NAME")"
 
-	if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]
-	then
-		log "Deleting remote branch '$REMOTE_NAME/$BRANCH_NAME'..."
-		git push "$REMOTE_NAME" --delete "$BRANCH_NAME" 2>/dev/null || true
-
-		log "Pushing to '$REMOTE_NAME/$BRANCH_NAME'..."
-		git push "$REMOTE_NAME" "$BRANCH_NAME" \
-			|| abort "Error pushing to '$REMOTE_NAME/$BRANCH_NAME'."
-	else
-		log "Remote branch '$REMOTE_NAME/$BRANCH_NAME' is already up to date, skipping push."
-	fi
+	push_to_isx_remote "$REMOTE_NAME" "$BRANCH_NAME" "$REMOTE_DEFAULT_BRANCH"
 
 	log "Successfully pushed branch '$BRANCH_NAME'."
 }
