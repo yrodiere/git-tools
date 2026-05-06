@@ -1,5 +1,8 @@
 #!/bin/bash
-# Checkout and rebase branches from issue tracker integrations
+# Pull from and push to repos in incus-spawn instances,
+# rebasing commits as necessary to sign them.
+# Also creates PRs using git-pr.
+# See https://github.com/Sanne/incus-spawn/
 
 source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
 
