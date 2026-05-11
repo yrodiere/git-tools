@@ -1,0 +1,36 @@
+# Completion for git-trim (bash and zsh compatible)
+
+if [ -n "$ZSH_VERSION" ]; then
+    # Zsh completion
+    _git-trim() {
+        local -a subcommands branches
+        subcommands=(
+            'jira:trim branches by JIRA status'
+            'pr:trim branches by PR status'
+            'merged:trim merged branches'
+            'list:trim specific branches'
+        )
+
+        if (( CURRENT == 2 )); then
+            _describe 'command' subcommands
+        elif (( CURRENT >= 3 )) && [[ "$words[2]" == "list" ]]; then
+            # Complete with local branches
+            branches=(${(f)"$(git branch 2>/dev/null | sed 's/^[* ]*//')"})
+            _describe 'branch' branches
+        fi
+    }
+else
+    # Bash completion
+    _git_trim() {
+        local subcommands="jira pr merged list"
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+        local prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+        if [ $COMP_CWORD -eq 1 ]; then
+            COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
+        elif [ "$prev" = "list" ]; then
+            # Complete with local branches
+            __git_complete_refs --mode=heads
+        fi
+    }
+fi

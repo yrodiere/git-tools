@@ -1,0 +1,20 @@
+# Completion for git-authors (bash and zsh compatible)
+
+if [ -n "$ZSH_VERSION" ]; then
+    # Zsh completion
+    _git-authors() {
+        local -a subcommands
+        subcommands=('list:list authors' 'grep-javadoc:search javadoc for authors')
+        _describe 'command' subcommands
+    }
+else
+    # Bash completion
+    _git_authors() {
+        local subcommands="list grep-javadoc"
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+
+        if [ $COMP_CWORD -eq 1 ]; then
+            COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
+        fi
+    }
+fi

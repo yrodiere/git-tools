@@ -1,0 +1,31 @@
+# Completion for git-pr (bash and zsh compatible)
+
+if [ -n "$ZSH_VERSION" ]; then
+    # Zsh completion
+    _git-pr() {
+        local -a subcommands branches
+        subcommands=('setuser:set user configuration' 'create:create pull request')
+
+        if (( CURRENT == 2 )); then
+            _describe 'command' subcommands
+        elif (( CURRENT == 3 )) && [[ "$words[2]" == "create" ]]; then
+            # Complete with local branches
+            branches=(${(f)"$(git branch 2>/dev/null | sed 's/^[* ]*//')"})
+            _describe 'branch' branches
+        fi
+    }
+else
+    # Bash completion
+    _git_pr() {
+        local subcommands="setuser create"
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+        local prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+        if [ $COMP_CWORD -eq 1 ]; then
+            COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
+        elif [ "$prev" = "create" ]; then
+            # Complete with local branches
+            __git_complete_refs --mode=heads
+        fi
+    }
+fi

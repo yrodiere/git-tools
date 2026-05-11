@@ -1,0 +1,20 @@
+# Completion for git-jira (bash and zsh compatible)
+
+if [ -n "$ZSH_VERSION" ]; then
+    # Zsh completion
+    _git-jira() {
+        local -a subcommands
+        subcommands=('setup:setup JIRA configuration' 'info:get ticket info')
+        _describe 'command' subcommands
+    }
+else
+    # Bash completion
+    _git_jira() {
+        local subcommands="setup info"
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+
+        if [ $COMP_CWORD -eq 1 ]; then
+            COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
+        fi
+    }
+fi

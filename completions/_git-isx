@@ -1,0 +1,30 @@
+# Completion for git-isx (bash and zsh compatible)
+
+if [ -n "$ZSH_VERSION" ]; then
+    # Zsh completion
+    _git-isx() {
+        local -a subcommands remotes
+        subcommands=('get:fetch from remote' 'put:push to remote' 'pr:create pull request')
+
+        if (( CURRENT == 2 )); then
+            _describe 'command' subcommands
+        elif (( CURRENT == 3 )); then
+            # Complete with git remotes
+            remotes=(${(f)"$(git remote 2>/dev/null)"})
+            _describe 'remote' remotes
+        fi
+    }
+else
+    # Bash completion
+    _git_isx() {
+        local subcommands="get put pr"
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+
+        if [ $COMP_CWORD -eq 1 ]; then
+            COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
+        elif [ $COMP_CWORD -eq 2 ]; then
+            # Complete with git remotes
+            COMPREPLY=($(compgen -W "$(git remote 2>/dev/null)" -- "$cur"))
+        fi
+    }
+fi

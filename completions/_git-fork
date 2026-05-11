@@ -1,0 +1,57 @@
+# Completion for git-fork (bash and zsh compatible)
+
+if [ -n "$ZSH_VERSION" ]; then
+    # Zsh completion
+    _git-fork() {
+        local -a subcommands get_options branch_options
+        subcommands=(
+            'setup:setup fork configuration'
+            'purge:purge fork data'
+            'get:get fork property'
+            'branch:branch operations'
+        )
+        get_options=(
+            'upstream.remote' 'upstream.url.http' 'upstream.branch.head.relative'
+            'upstream.repository.name' 'remote' 'url.http' 'user.name'
+        )
+        branch_options=('init:initialize branch')
+
+        if (( CURRENT == 2 )); then
+            _describe 'command' subcommands
+        elif (( CURRENT == 3 )); then
+            case "$words[2]" in
+                get)
+                    _describe 'property' get_options
+                    ;;
+                branch)
+                    _describe 'operation' branch_options
+                    ;;
+                setup)
+                    local -a remotes
+                    remotes=(${(f)"$(git remote 2>/dev/null)"})
+                    _describe 'remote' remotes
+                    ;;
+            esac
+        fi
+    }
+else
+    # Bash completion
+    _git_fork() {
+        local subcommands="setup purge get branch"
+        local get_options="upstream.remote upstream.url.http upstream.branch.head.relative upstream.repository.name remote url.http user.name"
+        local branch_options="init"
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+        local prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+        if [ $COMP_CWORD -eq 1 ]; then
+            COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
+        elif [ $COMP_CWORD -eq 2 ] && [ "$prev" = "get" ]; then
+            COMPREPLY=($(compgen -W "$get_options" -- "$cur"))
+        elif [ $COMP_CWORD -eq 2 ] && [ "$prev" = "branch" ]; then
+            COMPREPLY=($(compgen -W "$branch_options" -- "$cur"))
+        elif [ "$prev" = "setup" ]; then
+            # Complete with git remotes
+            COMPREPLY=($(compgen -W "$(git remote 2>/dev/null)" -- "$cur"))
+        fi
+    }
+fi
