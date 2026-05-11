@@ -248,8 +248,6 @@ then
 	fi
 
 	get_branch "$NAME" "$BRANCH_NAME"
-
-	success "Successfully checked out and rebased branch '$BRANCH_NAME'."
 elif [ "$1" == 'put' ]
 then
 	shift
@@ -266,8 +264,6 @@ then
 	fi
 
 	put_branch "$NAME" "$BRANCH_NAME"
-
-	success "Successfully pushed branch '$BRANCH_NAME'."
 elif [ "$1" == 'pr' ]
 then
 	shift
@@ -302,8 +298,6 @@ then
 	log "Creating pull request..."
 	git pr create \
 		|| abort "Error creating pull request."
-
-	success "Successfully created pull request for branch '$BRANCH_NAME'."
 else
 	usage
 fi
