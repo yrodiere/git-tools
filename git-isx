@@ -77,11 +77,11 @@ function push_to_isx_remote() {
 	if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]
 	then
 		log "Pushing to '$REMOTE_NAME/$BRANCH_NAME'..."
-		git push --force "$REMOTE_NAME" "HEAD:$BRANCH_NAME" \
+		git push --force "$REMOTE_NAME" "HEAD:refs/heads/$BRANCH_NAME" \
 			|| abort "Error pushing to '$REMOTE_NAME/$BRANCH_NAME'."
 
 		log "Resetting '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH' to '$BRANCH_NAME'..."
-		run_on_isx_remote "$REMOTE_NAME" "git reset --hard $BRANCH_NAME" \
+		run_on_isx_remote "$REMOTE_NAME" "git reset --hard refs/heads/$BRANCH_NAME" \
 			|| abort "Error resetting working tree on '$REMOTE_NAME'."
 	else
 		log "Remote '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH' is already up to date, skipping push."
@@ -138,7 +138,7 @@ function get_branch() {
 		# Branch exists - checkout and rebase
 		log "Branch '$BRANCH_NAME' exists locally, checking out and rebasing..."
 
-		git checkout "$BRANCH_NAME" \
+		git checkout "refs/heads/$BRANCH_NAME" \
 			|| abort "Error while checking out branch '$BRANCH_NAME'."
 
 		# Reset to the remote's default branch
@@ -243,7 +243,7 @@ then
 		BRANCH_NAME="$1"
 	else
 		# Use current branch name
-		BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+		BRANCH_NAME=$(git symbolic-ref --short HEAD)
 		NAME="$BRANCH_NAME"
 	fi
 
@@ -261,7 +261,7 @@ then
 		BRANCH_NAME="$1"
 	else
 		# Use current branch name
-		BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+		BRANCH_NAME=$(git symbolic-ref --short HEAD)
 		NAME="$BRANCH_NAME"
 	fi
 
@@ -279,7 +279,7 @@ then
 		BRANCH_NAME="$1"
 	else
 		# Use current branch name
-		BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+		BRANCH_NAME=$(git symbolic-ref --short HEAD)
 		NAME="$BRANCH_NAME"
 	fi
 
@@ -295,7 +295,7 @@ then
 		# Remote tracking already set up, just force push
 		FORK_REMOTE="$(git fork get remote)"
 		log "Force pushing to fork remote '$FORK_REMOTE'..."
-		git push -f "$FORK_REMOTE" "$BRANCH_NAME" \
+		git push -f "$FORK_REMOTE" "refs/heads/$BRANCH_NAME:refs/heads/$BRANCH_NAME" \
 			|| abort "Error force pushing to fork remote."
 	fi
 
