@@ -138,7 +138,7 @@ function get_branch() {
 		# Branch exists - checkout and rebase
 		log "Branch '$BRANCH_NAME' exists locally, checking out and rebasing..."
 
-		git checkout "refs/heads/$BRANCH_NAME" \
+		git switch "$BRANCH_NAME" \
 			|| abort "Error while checking out branch '$BRANCH_NAME'."
 
 		# Reset to the remote's default branch
@@ -176,7 +176,7 @@ function get_branch() {
 		log "Branch '$BRANCH_NAME' doesn't exist locally, creating from '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH'..."
 
 		# Create branch from remote's default branch without setting up tracking
-		git checkout -b "$BRANCH_NAME" --no-track "$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH" \
+		git switch -c "$BRANCH_NAME" --no-track "$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH" \
 			|| abort "Error while creating branch '$BRANCH_NAME' from '$REMOTE_NAME/$REMOTE_DEFAULT_BRANCH'."
 
 		# Rebase on upstream/main or origin/main
