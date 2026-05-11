@@ -34,6 +34,9 @@ function get_base_branch() {
 		BASE_REMOTE="origin"
 	fi
 
+	# Ensure the base remote has been fetched
+	git fetch "$BASE_REMOTE" >/dev/null 2>&1 || true
+
 	# Get the default branch from the remote
 	if ! BASE_BRANCH=$(git rev-parse --abbrev-ref "$BASE_REMOTE/HEAD" 2>/dev/null)
 	then
