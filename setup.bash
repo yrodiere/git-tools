@@ -10,17 +10,9 @@ if [[ ":$PATH:" != *":$GIT_TOOLS_DIR:"* ]]; then
     export PATH="$GIT_TOOLS_DIR:$PATH"
 fi
 
-# Setup completions
-if [ -n "$ZSH_VERSION" ]; then
-    # Zsh: add completions to fpath
-    fpath=("$GIT_TOOLS_DIR/completions" $fpath)
-    autoload -Uz compinit
-    compinit -C
-else
-    # Bash: source completion files
-    for completion in "$GIT_TOOLS_DIR/completions"/_git-*; do
-        if [ -f "$completion" ]; then
-            source "$completion"
-        fi
-    done
-fi
+# Setup completions: source completion files (they define _git-foo functions directly)
+for completion in "$GIT_TOOLS_DIR/completions"/_git-*; do
+    if [ -f "$completion" ]; then
+        source "$completion"
+    fi
+done
