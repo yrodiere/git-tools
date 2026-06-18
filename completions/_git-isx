@@ -9,8 +9,8 @@ if [ -n "$ZSH_VERSION" ]; then
         if (( CURRENT == 2 )); then
             _describe 'command' subcommands
         elif (( CURRENT == 3 )); then
-            # Complete with git remotes
-            remotes=(${(f)"$(git remote 2>/dev/null)"})
+            # Complete with git remotes using the isx:// protocol
+            remotes=(${(f)"$(git remote -v 2>/dev/null | awk '/isx:\/\//{print $1}' | sort -u)"})
             _describe 'remote' remotes
         fi
     }
@@ -23,8 +23,8 @@ else
         if [ $COMP_CWORD -eq 1 ]; then
             COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
         elif [ $COMP_CWORD -eq 2 ]; then
-            # Complete with git remotes
-            COMPREPLY=($(compgen -W "$(git remote 2>/dev/null)" -- "$cur"))
+            # Complete with git remotes using the isx:// protocol
+            COMPREPLY=($(compgen -W "$(git remote -v 2>/dev/null | awk '/isx:\/\//{print $1}' | sort -u)" -- "$cur"))
         fi
     }
 fi
