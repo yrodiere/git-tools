@@ -9,13 +9,13 @@ function usage() {
        	log -e 'OR'
        	log -e '\tgit pr <user>:<branch>'
        	log -e 'OR'
-       	log -e '\tgit pr create'
+       	log -e '\tgit pr create [--body-prefix <text>]'
        	log -e 'OR'
-       	log -e '\tgit pr create <branch>'
+       	log -e '\tgit pr create [--body-prefix <text>] <branch>'
        	log -e 'OR'
-       	log -e '\tgit pr create <branch> <jira ticket>'
+       	log -e '\tgit pr create [--body-prefix <text>] <branch> <jira ticket>'
        	log -e 'OR'
-       	log -e '\tgit pr create <branch> <jira ticket> <upstream branch>'
+       	log -e '\tgit pr create [--body-prefix <text>] <branch> <jira ticket> <upstream branch>'
 	abort
 }
 
@@ -34,6 +34,8 @@ function create_pr() {
 	local JIRA_INFO
 	JIRA_INFO=( $(echo $FORK_BRANCH | git jira translate-branch-name 2>/dev/null || true) )
 
+	local UPSTREAM_REMOTE
+	UPSTREAM_REMOTE="$(git fork get upstream.remote)"
 	local UPSTREAM_HEAD_BRANCH
 	UPSTREAM_HEAD_BRANCH="$3"
 	local UPSTREAM_DEFAULT_HEAD_BRANCH
@@ -57,7 +59,7 @@ or because git-jira is not set up). Defaulting to '$UPSTREAM_HEAD_BRANCH'."
 	local JIRA_TICKET_KEYS=( $2 )
 	if (( ${#JIRA_TICKET_KEYS[@]} == 0 ))
 	then
-		JIRA_TICKET_KEYS_STRING="$(git log "$UPSTREAM_HEAD_BRANCH..$FORK_BRANCH" --format="%s" | git jira extract-ticket-keys 2>/dev/null || true)"
+		JIRA_TICKET_KEYS_STRING="$(git log "$UPSTREAM_REMOTE/$UPSTREAM_HEAD_BRANCH..$FORK_BRANCH" --format="%s" | git jira extract-ticket-keys 2>/dev/null || true)"
 		JIRA_TICKET_KEYS=( $JIRA_TICKET_KEYS_STRING )
 		if (( ${#JIRA_TICKET_KEYS[@]} < 0 || 20 < ${#JIRA_TICKET_KEYS[@]} ))
 		then
@@ -93,6 +95,9 @@ or because git-jira is not set up). The PR title and text won't be populated aut
 		PR_CREATE_URL+="&"
 		PR_CREATE_URL+=$(git jira info "${JIRA_TICKET_KEYS[@]}" | jq -r '[.key, .summary] | @tsv' \
 			| build_title_and_body "${JIRA_TICKET_KEYS[@]}")
+	elif [ -n "$BODY_PREFIX" ]
+	then
+		PR_CREATE_URL+="&body=$(echo "$BODY_PREFIX" | urlencode)"
 	fi
 
 	xdg-open "$PR_CREATE_URL"
@@ -120,12 +125,15 @@ function build_title_and_body() {
 		TITLE="$(echo "Backport ${JIRA_TICKET_KEYS_FOR_TITLE[*]} to branch $UPSTREAM_HEAD_BRANCH - $MAIN_JIRA_TICKET_SUMMARY")"
 	fi
 
-	local BODY
+	local BODY="$BODY_PREFIX"
+	if [ -n "$BODY" ]; then
+		BODY+=$'\n\n'
+	fi
 	if (( $# == 1 ))
 	then
-		BODY="$(git jira url "$1")"
+		BODY+="$(git jira url "$1")"
 	else
-		BODY="$TICKET_LIST"
+		BODY+="$TICKET_LIST"
 	fi
 
 	log "PR title:"
@@ -179,6 +187,17 @@ git config --local --unset 'pr.repository.name' 1>/dev/null 2>&1 && log "Cleaned
 if [ "$1" == 'create' ]
 then
 	shift
+	BODY_PREFIX=""
+	while [[ "${1:-}" == --* ]]; do
+		case "$1" in
+			--body-prefix)
+				[ -n "${2:-}" ] || usage
+				BODY_PREFIX="$2"
+				shift 2
+				;;
+			*) usage ;;
+		esac
+	done
 	if (( $# == 0 ))
 	then
 		FORK_BRANCH=$(git rev-parse --abbrev-ref HEAD)
