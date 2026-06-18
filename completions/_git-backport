@@ -1,0 +1,28 @@
+# Completion for git-backport (bash and zsh compatible)
+
+if [ -n "$ZSH_VERSION" ]; then
+    # Zsh completion
+    _git-backport() {
+        local upstream_remote
+        upstream_remote=$(git fork get upstream.remote 2>/dev/null) || return
+
+        local -a branches
+        branches=(${(f)"$(git branch -r --list "$upstream_remote/*" 2>/dev/null \
+            | sed "s|^ *$upstream_remote/||" \
+            | grep -v '^HEAD ')"})
+        _describe 'upstream branch' branches
+    }
+else
+    # Bash completion
+    _git_backport() {
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+        local upstream_remote
+        upstream_remote=$(git fork get upstream.remote 2>/dev/null) || return
+
+        local branches
+        branches=$(git branch -r --list "$upstream_remote/*" 2>/dev/null \
+            | sed "s|^ *$upstream_remote/||" \
+            | grep -v '^HEAD ')
+        COMPREPLY=($(compgen -W "$branches" -- "$cur"))
+    }
+fi

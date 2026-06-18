@@ -1,0 +1,232 @@
+#!/bin/bash
+# Backport the current branch's commits to multiple upstream branches.
+# Creates one branch and PR per target branch.
+
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
+
+function usage() {
+	log 'Usage:'
+	log -e '\tgit backport <upstream-branch> [<upstream-branch>...]'
+	log ''
+	log 'Backports the commits from the current branch to each specified upstream branch.'
+	log 'For each target, creates a <current-branch>-<target> branch, rebases the commits'
+	log 'onto the target, pushes to the fork remote, and opens a PR.'
+	abort
+}
+
+BACKPORT_ACTION=""
+
+function rebase_in_progress() {
+	local GIT_DIR
+	GIT_DIR=$(git rev-parse --git-dir)
+	[ -d "$GIT_DIR/rebase-merge" ] || [ -d "$GIT_DIR/rebase-apply" ]
+}
+
+function has_unmerged_files() {
+	[ -n "$(git ls-files -u)" ]
+}
+
+function ask_give_up() {
+	local choice
+	select choice in "Give up on this branch" "Give up on all remaining branches"; do
+		case $REPLY in
+			1) BACKPORT_ACTION="skip"; return ;;
+			2) BACKPORT_ACTION="skip-all"; return ;;
+		esac
+	done
+	BACKPORT_ACTION="skip"
+}
+
+function open_shell() {
+	log ""
+	log "Opening a nested shell to resolve conflicts."
+	log "Stage your resolved files with 'git add', then exit (Ctrl+D) when done."
+	"${SHELL:-bash}" || true
+}
+
+function wait_for_rebase() {
+	local UPSTREAM_REF="$1"
+	BACKPORT_ACTION="completed"
+
+	open_shell
+
+	while true; do
+		# Rebase finished while the user was in the shell
+		if ! rebase_in_progress
+		then
+			if [ -n "$UPSTREAM_REF" ] && ! git merge-base --is-ancestor "$UPSTREAM_REF" HEAD
+			then
+				log ""
+				log "Rebase was not completed."
+				ask_give_up
+			fi
+			return
+		fi
+
+		# Rebase still in progress; try to continue if conflicts are resolved
+		if ! has_unmerged_files
+		then
+			log "No remaining conflicts. Continuing rebase..."
+			if git rebase --continue
+			then
+				continue
+			fi
+		fi
+
+		# rebase --continue may have finished the rebase
+		if ! rebase_in_progress
+		then
+			continue
+		fi
+
+		# Still stuck — ask the user what to do
+		log ""
+		if has_unmerged_files
+		then
+			log "There are still unresolved conflicts."
+		else
+			log "The rebase needs manual intervention (e.g. empty commit — use 'git rebase --skip')."
+		fi
+		local choice
+		select choice in "Open shell to resolve" "Give up on this branch" "Give up on all remaining branches"; do
+			case $REPLY in
+				1) break ;;
+				2) BACKPORT_ACTION="skip"; git rebase --abort 2>/dev/null || true; return ;;
+				3) BACKPORT_ACTION="skip-all"; git rebase --abort 2>/dev/null || true; return ;;
+			esac
+		done
+
+		open_shell
+	done
+}
+
+(( $# >= 1 )) || usage
+
+UPSTREAM_REMOTE=$(git fork get upstream.remote)
+FORK_REMOTE=$(git fork get remote)
+INITIAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+TARGET_BRANCHES=("$@")
+
+[ "$INITIAL_BRANCH" != "HEAD" ] \
+	|| abort "Cannot backport from a detached HEAD."
+
+log "Fetching upstream remote '$UPSTREAM_REMOTE'..."
+git fetch "$UPSTREAM_REMOTE"
+
+for BRANCH in "${TARGET_BRANCHES[@]}"; do
+	git rev-parse --verify "$UPSTREAM_REMOTE/$BRANCH" >/dev/null 2>&1 \
+		|| abort "Branch '$BRANCH' does not exist on remote '$UPSTREAM_REMOTE'."
+done
+
+BASE_BRANCH=$(git fork closest-upstream-branch-name "$INITIAL_BRANCH" 2>/dev/null) \
+	|| true
+[ -n "$BASE_BRANCH" ] \
+	|| abort "Could not detect the upstream base branch of '$INITIAL_BRANCH'."
+log "Detected base branch: '$BASE_BRANCH'"
+
+COMMIT_COUNT=$(git rev-list --count "$UPSTREAM_REMOTE/$BASE_BRANCH..$INITIAL_BRANCH")
+(( COMMIT_COUNT > 0 )) \
+	|| abort "No commits to backport: '$INITIAL_BRANCH' has no commits beyond '$UPSTREAM_REMOTE/$BASE_BRANCH'."
+log "Found $COMMIT_COUNT commit(s) to backport."
+
+# Ensure the initial branch is rebased on its upstream base
+if ! git merge-base --is-ancestor "$UPSTREAM_REMOTE/$BASE_BRANCH" "$INITIAL_BRANCH"
+then
+	log "Branch '$INITIAL_BRANCH' needs to be rebased on '$UPSTREAM_REMOTE/$BASE_BRANCH'..."
+	BACKPORT_ACTION="completed"
+	if ! git rebase "$UPSTREAM_REMOTE/$BASE_BRANCH"
+	then
+		wait_for_rebase "$UPSTREAM_REMOTE/$BASE_BRANCH"
+	fi
+	[ "$BACKPORT_ACTION" = "completed" ] \
+		|| abort "Rebase of '$INITIAL_BRANCH' on '$UPSTREAM_REMOTE/$BASE_BRANCH' was not completed."
+	log "Rebase of '$INITIAL_BRANCH' on '$UPSTREAM_REMOTE/$BASE_BRANCH' complete."
+fi
+
+# Try to find an existing PR for the initial branch
+INITIAL_PR=""
+if command -v gh >/dev/null 2>&1
+then
+	FORK_USERNAME=$(git fork get user.name)
+	UPSTREAM_REPO=$(git fork get upstream.url.http | sed -r 's,https://[^/]+/,,')
+	INITIAL_PR=$(gh api "repos/$UPSTREAM_REPO/pulls?head=$FORK_USERNAME:$INITIAL_BRANCH&state=all&per_page=1" --jq '.[0].number // empty' 2>/dev/null) || true
+	if [ -n "$INITIAL_PR" ]
+	then
+		log "Found existing PR #$INITIAL_PR for branch '$INITIAL_BRANCH'."
+	fi
+fi
+
+OVERRIDE_ALL=false
+
+for BRANCH in "${TARGET_BRANCHES[@]}"; do
+	BACKPORT_BRANCH="${INITIAL_BRANCH}-${BRANCH}"
+	FORCE_PUSH=false
+	log ""
+	log "=== Backporting to '$BRANCH' (branch: '$BACKPORT_BRANCH') ==="
+
+	if git rev-parse --verify "refs/heads/$BACKPORT_BRANCH" >/dev/null 2>&1
+	then
+		if $OVERRIDE_ALL
+		then
+			log "Branch '$BACKPORT_BRANCH' already exists, overriding."
+		else
+			log "Branch '$BACKPORT_BRANCH' already exists."
+			OVERRIDE=false
+			select choice in "Override" "Override all existing branches" "Skip this branch" "Skip all remaining branches"; do
+				case $REPLY in
+					1) OVERRIDE=true; break ;;
+					2) OVERRIDE_ALL=true; break ;;
+					3) continue 2 ;;
+					4) break 2 ;;
+				esac
+			done
+			if ! $OVERRIDE && ! $OVERRIDE_ALL
+			then
+				continue
+			fi
+		fi
+		git branch -D "$BACKPORT_BRANCH"
+		FORCE_PUSH=true
+	fi
+
+	git switch -c "$BACKPORT_BRANCH" "$INITIAL_BRANCH"
+
+	BACKPORT_ACTION="completed"
+	if ! git rebase --onto "$UPSTREAM_REMOTE/$BRANCH" "$UPSTREAM_REMOTE/$BASE_BRANCH"
+	then
+		wait_for_rebase "$UPSTREAM_REMOTE/$BRANCH"
+	fi
+
+	if [ "$BACKPORT_ACTION" = "skip" ] || [ "$BACKPORT_ACTION" = "skip-all" ]
+	then
+		git switch "$INITIAL_BRANCH"
+		git branch -D "$BACKPORT_BRANCH"
+		if [ "$BACKPORT_ACTION" = "skip-all" ]
+		then
+			log "Giving up on all remaining branches."
+			break
+		fi
+		continue
+	fi
+
+	log "Pushing '$BACKPORT_BRANCH' to '$FORK_REMOTE'..."
+	if $FORCE_PUSH
+	then
+		git push --force-with-lease -u "$FORK_REMOTE" "$BACKPORT_BRANCH"
+	else
+		git push -u "$FORK_REMOTE" "$BACKPORT_BRANCH"
+	fi
+
+	log "Creating PR..."
+	if [ -n "$INITIAL_PR" ]
+	then
+		git pr create --body-prefix "Backport of #$INITIAL_PR to branch $BRANCH" "$BACKPORT_BRANCH" "" "$BRANCH"
+	else
+		git pr create "$BACKPORT_BRANCH" "" "$BRANCH"
+	fi
+
+	git switch "$INITIAL_BRANCH"
+done
+
+log ""
+log "Backporting complete."
