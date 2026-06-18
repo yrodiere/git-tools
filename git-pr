@@ -26,6 +26,10 @@ function create_remote() {
 function create_pr() {
 	local FORK_BRANCH
 	FORK_BRANCH="$1"
+	# Strip the "heads/" prefix that git rev-parse --abbrev-ref can add
+	# when there's ref ambiguity (e.g. a tag with the same name as the branch).
+	# GitHub/GitLab URLs need just the branch name.
+	FORK_BRANCH="${FORK_BRANCH#heads/}"
 
 	local JIRA_INFO
 	JIRA_INFO=( $(echo $FORK_BRANCH | git jira translate-branch-name 2>/dev/null || true) )
