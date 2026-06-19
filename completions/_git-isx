@@ -9,8 +9,18 @@ if [ -n "$ZSH_VERSION" ]; then
         if (( CURRENT == 2 )); then
             _describe 'command' subcommands
         elif (( CURRENT == 3 )); then
-            # Complete with git remotes using the isx:// protocol
-            remotes=(${(f)"$(git remote -v 2>/dev/null | awk '/isx:\/\//{print $1}' | sort -u)"})
+            # Complete with isx:// remotes, stripping the git directory name prefix
+            local git_dir_name
+            git_dir_name="$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)"
+            local raw_remotes=(${(f)"$(git remote -v 2>/dev/null | awk '/isx:\/\//{print $1}' | sort -u)"})
+            remotes=()
+            for r in "${raw_remotes[@]}"; do
+                if [[ -n "$git_dir_name" && "$r" == "${git_dir_name}-"* ]]; then
+                    remotes+=("${r#${git_dir_name}-}")
+                else
+                    remotes+=("$r")
+                fi
+            done
             _describe 'remote' remotes
         fi
     }
@@ -23,8 +33,18 @@ else
         if [ $COMP_CWORD -eq 1 ]; then
             COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
         elif [ $COMP_CWORD -eq 2 ]; then
-            # Complete with git remotes using the isx:// protocol
-            COMPREPLY=($(compgen -W "$(git remote -v 2>/dev/null | awk '/isx:\/\//{print $1}' | sort -u)" -- "$cur"))
+            # Complete with isx:// remotes, stripping the git directory name prefix
+            local git_dir_name
+            git_dir_name="$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)"
+            local completions=""
+            while IFS= read -r r; do
+                if [[ -n "$git_dir_name" && "$r" == "${git_dir_name}-"* ]]; then
+                    completions+=" ${r#${git_dir_name}-}"
+                else
+                    completions+=" $r"
+                fi
+            done < <(git remote -v 2>/dev/null | awk '/isx:\/\//{print $1}' | sort -u)
+            COMPREPLY=($(compgen -W "$completions" -- "$cur"))
         fi
     }
 fi
