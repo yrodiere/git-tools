@@ -76,6 +76,16 @@ function push_to_isx_remote() {
 
 	if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]
 	then
+		local REMOTE_STATUS
+		REMOTE_STATUS=$(run_on_isx_remote "$REMOTE_NAME" "git status --porcelain") \
+			|| abort "Error checking working tree status on '$REMOTE_NAME'."
+		if [ -n "$REMOTE_STATUS" ]
+		then
+			log "Remote '$REMOTE_NAME' has staged/unstaged changes:"
+			log "$REMOTE_STATUS"
+			abort "Refusing to push to avoid losing uncommitted work. Commit or discard changes on the instance first."
+		fi
+
 		log "Pushing to '$REMOTE_NAME/$BRANCH_NAME'..."
 		git push --force "$REMOTE_NAME" "HEAD:refs/heads/$BRANCH_NAME" \
 			|| abort "Error pushing to '$REMOTE_NAME/$BRANCH_NAME'."
