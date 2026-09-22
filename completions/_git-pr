@@ -4,7 +4,7 @@ if [ -n "$ZSH_VERSION" ]; then
     # Zsh completion
     _git-pr() {
         local -a subcommands branches
-        subcommands=('setuser:set user configuration' 'create:create pull request')
+        subcommands=('setuser:set user configuration' 'create:create pull request' 'diff:diff two versions of a PR')
 
         if (( CURRENT == 2 )); then
             _describe 'command' subcommands
@@ -17,7 +17,7 @@ if [ -n "$ZSH_VERSION" ]; then
 else
     # Bash completion
     _git_pr() {
-        local subcommands="setuser create"
+        local subcommands="setuser create diff"
         local cur="${COMP_WORDS[COMP_CWORD]}"
         local prev="${COMP_WORDS[COMP_CWORD-1]}"
 

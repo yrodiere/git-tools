@@ -16,6 +16,8 @@ function usage() {
        	log -e '\tgit pr create [--body-prefix <text>] <branch> <jira ticket>'
        	log -e 'OR'
        	log -e '\tgit pr create [--body-prefix <text>] <branch> <jira ticket> <upstream branch>'
+       	log -e 'OR'
+       	log -e '\tgit pr diff [--target <branch>] <pr_number> [<old_sha>] [<range-diff-args>...]'
 	abort
 }
 
@@ -144,6 +146,118 @@ function build_title_and_body() {
 	echo "title=$(echo "$TITLE" | urlencode)&body=$(echo "$BODY" | urlencode)"
 }
 
+function diff_pr() {
+	local TARGET_BRANCH=""
+	if [ "${1:-}" = "--target" ]
+	then
+		[ -n "${2:-}" ] || usage
+		TARGET_BRANCH="$2"
+		shift 2
+	fi
+
+	(( $# >= 1 )) || usage
+
+	local PR_NUMBER="$1"
+	shift
+
+	local OLD_HEAD_ARG=""
+	if (( $# > 0 )) && [[ "$1" != -* ]]
+	then
+		OLD_HEAD_ARG="$1"
+		shift
+	fi
+
+	local UPSTREAM_REMOTE
+	UPSTREAM_REMOTE="$(git fork get upstream.remote)"
+
+	# Fetch current PR head
+	git fetch "$UPSTREAM_REMOTE" "pull/$PR_NUMBER/head" 2>/dev/null \
+		|| abort "Cannot fetch PR #$PR_NUMBER from '$UPSTREAM_REMOTE'."
+	local NEW_HEAD
+	NEW_HEAD=$(git rev-parse FETCH_HEAD)
+
+	# Old head: explicit SHA or last-reviewed commit
+	local OLD_HEAD
+	if [ -n "$OLD_HEAD_ARG" ]
+	then
+		if ! git cat-file -t "$OLD_HEAD_ARG^{commit}" 1>/dev/null 2>&1
+		then
+			log "Fetching commit $OLD_HEAD_ARG..."
+			git fetch "$UPSTREAM_REMOTE" "$OLD_HEAD_ARG" 2>/dev/null \
+				|| abort "Cannot resolve or fetch '$OLD_HEAD_ARG'."
+		fi
+		OLD_HEAD=$(git rev-parse --verify "$OLD_HEAD_ARG^{commit}") \
+			|| abort "Cannot resolve '$OLD_HEAD_ARG' to a commit."
+	else
+		which gh 1>/dev/null 2>&1 \
+			|| abort "'gh' CLI is required to detect the last-reviewed commit. Install it or provide an explicit old SHA."
+
+		local UPSTREAM_URL
+		UPSTREAM_URL="$(git fork get upstream.url.http)"
+		local OWNER_REPO
+		OWNER_REPO=$(echo "$UPSTREAM_URL" | sed -r 's,https://github.com/,,;s,\.git$,,;s,/$,,')
+		[[ "$OWNER_REPO" =~ ^[^/]+/[^/]+$ ]] \
+			|| abort "Cannot determine GitHub repository from upstream URL '$UPSTREAM_URL'. Provide an explicit old SHA."
+
+		local GH_USER
+		GH_USER=$(gh api user --jq '.login' 2>/dev/null) \
+			|| abort "Cannot determine current GitHub user. Make sure 'gh' is authenticated."
+
+		if ! OLD_HEAD=$(gh api "repos/$OWNER_REPO/pulls/$PR_NUMBER/reviews" \
+			--jq "[.[] | select(.user.login == \"$GH_USER\" and .state != \"PENDING\")] | last | .commit_id // empty" 2>/dev/null)
+		then
+			abort "Cannot fetch reviews for PR #$PR_NUMBER."
+		fi
+		[ -n "$OLD_HEAD" ] \
+			|| abort "No reviews by '$GH_USER' found on PR #$PR_NUMBER. Provide an explicit old SHA."
+
+		log "Last review by '$GH_USER' on PR #$PR_NUMBER was at commit $(echo "$OLD_HEAD" | cut -c1-7)."
+
+		if ! git cat-file -t "$OLD_HEAD^{commit}" 1>/dev/null 2>&1
+		then
+			log "Fetching commit $OLD_HEAD..."
+			git fetch "$UPSTREAM_REMOTE" "$OLD_HEAD" 2>/dev/null \
+				|| abort "Cannot fetch commit $OLD_HEAD. It may have been garbage-collected by GitHub."
+		fi
+	fi
+
+	log "Old: $(git log -1 --format='%h %s' "$OLD_HEAD")"
+	log "New: $(git log -1 --format='%h %s' "$NEW_HEAD")"
+
+	if git merge-base --is-ancestor "$OLD_HEAD" "$NEW_HEAD"
+	then
+		# No force-push: old head is in new history, just show what's new
+		local UPSTREAM_URL
+		UPSTREAM_URL="$(git fork get upstream.url.http)"
+		local GITHUB_URL="$UPSTREAM_URL/pull/$PR_NUMBER/changes/$OLD_HEAD..$NEW_HEAD"
+		GIT_PAGER="awk 'BEGIN{print \"# GitHub: ${GITHUB_URL}\"; print \"\"}{print}' | $(git var GIT_PAGER)" \
+			git diff "$OLD_HEAD" "$NEW_HEAD" "${@}"
+	else
+		# Force-push (likely rebase): compare patches via range-diff
+		local TARGET
+		if [ -n "$TARGET_BRANCH" ]
+		then
+			TARGET=$(git rev-parse --verify "$TARGET_BRANCH^{commit}" 2>/dev/null) \
+				|| abort "Cannot resolve target branch '$TARGET_BRANCH'."
+		else
+			local UPSTREAM_HEAD
+			UPSTREAM_HEAD="$(git fork get upstream.branch.head.relative)"
+			TARGET=$(git rev-parse --verify "$UPSTREAM_REMOTE/$UPSTREAM_HEAD^{commit}" 2>/dev/null) \
+				|| abort "Cannot resolve target branch '$UPSTREAM_REMOTE/$UPSTREAM_HEAD'. Try specifying --target."
+		fi
+
+		log "Target: $(git log -1 --format='%h %s' "$TARGET")"
+
+		local OLD_BASE NEW_BASE
+		OLD_BASE=$(git merge-base "$TARGET" "$OLD_HEAD") \
+			|| abort "Cannot find merge-base between target and old head."
+		NEW_BASE=$(git merge-base "$TARGET" "$NEW_HEAD") \
+			|| abort "Cannot find merge-base between target and new head."
+
+		git range-diff --creation-factor=200 "$OLD_BASE..$OLD_HEAD" "$NEW_BASE..$NEW_HEAD" "${@}"
+	fi
+}
+
 function get_pr() {
 	local REMOTE_USER_NAME
 	REMOTE_USER_NAME="$1"
@@ -184,7 +298,12 @@ function get_pr() {
 # Automatically clean up an old configuration property
 git config --local --unset 'pr.repository.name' 1>/dev/null 2>&1 && log "Cleaned up old configuration property 'pr.repository.name'" || true
 
-if [ "$1" == 'create' ]
+if [ "$1" == 'diff' ]
+then
+	shift
+	diff_pr "${@}"
+	exit $?
+elif [ "$1" == 'create' ]
 then
 	shift
 	BODY_PREFIX=""
