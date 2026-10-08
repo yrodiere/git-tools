@@ -21,6 +21,8 @@ function usage() {
 	log -e '\t--detect-only         Print the detected target branch name and exit'
 	log -e '\t--max-commits <n>     Abort if more than <n> commits would be rebased'
 	log -e '\t                      (default: 50, 0 = no limit)'
+	log -e '\t-i, --interactive     Run an interactive rebase'
+	log -e '\t--autosquash          Reorder fixup!/squash! commits (implies -i)'
 	log -e '\t--no-fetch            Skip fetching the upstream remote'
 	abort
 }
@@ -31,6 +33,8 @@ MAX_COMMITS=50
 EXPLICIT_TARGET=""
 DO_FETCH=true
 DETECT_ONLY=false
+INTERACTIVE=false
+AUTOSQUASH=false
 BRANCH=""
 
 while (( $# > 0 )); do
@@ -48,6 +52,14 @@ while (( $# > 0 )); do
 			[ -n "${2:-}" ] || usage
 			MAX_COMMITS="$2"
 			shift 2
+			;;
+		-i|--interactive)
+			INTERACTIVE=true
+			shift
+			;;
+		--autosquash)
+			AUTOSQUASH=true
+			shift
 			;;
 		--no-fetch)
 			DO_FETCH=false
@@ -186,6 +198,15 @@ if git merge-base --is-ancestor "$TARGET" "$BRANCH_REF"; then
 	success
 fi
 
+REBASE_FLAGS=()
+if $AUTOSQUASH; then
+	REBASE_FLAGS+=(--autosquash)
+	INTERACTIVE=true
+fi
+if $INTERACTIVE; then
+	REBASE_FLAGS+=(--interactive)
+fi
+
 if [ "$BRANCH" != "$CURRENT_BRANCH" ]; then
 	log "Switching to '$BRANCH'..."
 fi
@@ -193,10 +214,10 @@ fi
 log "Rebasing '$BRANCH' onto '$TARGET' ($COMMIT_COUNT commit(s))..."
 
 if [ "$BRANCH" = "$CURRENT_BRANCH" ]; then
-	git rebase "$TARGET" \
+	git rebase "${REBASE_FLAGS[@]}" "$TARGET" \
 		|| abort "Rebase failed. Resolve conflicts and run 'git rebase --continue', or 'git rebase --abort' to cancel."
 else
-	git rebase "$TARGET" "$BRANCH_REF" \
+	git rebase "${REBASE_FLAGS[@]}" "$TARGET" "$BRANCH_REF" \
 		|| abort "Rebase failed. Resolve conflicts and run 'git rebase --continue', or 'git rebase --abort' to cancel."
 fi
 
