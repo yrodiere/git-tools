@@ -192,7 +192,7 @@ fi
 
 # --- Rebase ---
 
-if git merge-base --is-ancestor "$TARGET" "$BRANCH_REF"; then
+if ! $INTERACTIVE && ! $AUTOSQUASH && git merge-base --is-ancestor "$TARGET" "$BRANCH_REF"; then
 	AHEAD_COUNT=$(git rev-list --count "$TARGET..$BRANCH_REF")
 	log "'$BRANCH' is already based on '$TARGET' ($AHEAD_COUNT commit(s) ahead). Nothing to rebase."
 	success
