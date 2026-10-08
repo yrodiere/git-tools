@@ -27,6 +27,8 @@ if [ -n "$ZSH_VERSION" ]; then
             '--onto[Explicit rebase target]:target branch:_describe "upstream branch" branches' \
             '--max-commits[Maximum commits to rebase]:count:' \
             '--detect-only[Print detected target and exit]' \
+            '(-i --interactive)'{-i,--interactive}'[Run an interactive rebase]' \
+            '--autosquash[Reorder fixup!/squash! commits (implies -i)]' \
             '--no-fetch[Skip fetching upstream]' \
             ':branch:_describe "local branch" local_branches'
     }
@@ -51,8 +53,8 @@ else
             return
         fi
 
-        if [[ "$cur" == --* ]]; then
-            COMPREPLY=($(compgen -W "--onto --detect-only --max-commits --no-fetch" -- "$cur"))
+        if [[ "$cur" == -* ]]; then
+            COMPREPLY=($(compgen -W "--onto --detect-only --max-commits -i --interactive --autosquash --no-fetch" -- "$cur"))
             return
         fi
 
