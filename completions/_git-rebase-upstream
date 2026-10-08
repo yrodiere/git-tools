@@ -1,0 +1,63 @@
+# Completion for git-rebase-upstream (bash and zsh compatible)
+
+if [ -n "$ZSH_VERSION" ]; then
+    # Zsh completion
+    _git-rebase-upstream() {
+        local upstream_remote
+        upstream_remote=$(git fork get upstream.remote 2>/dev/null) || return
+
+        local -a branches
+        branches=(${(f)"$(git branch -r --list "$upstream_remote/*" 2>/dev/null \
+            | sed "s|^ *$upstream_remote/||" \
+            | grep -v '^HEAD ')"})
+
+        local -a local_branches
+        local_branches=(${(f)"$(git branch --format='%(refname:short)' 2>/dev/null)"})
+
+        if [[ "${words[CURRENT-1]}" == "--onto" ]]; then
+            _describe "upstream branch" branches
+            return
+        fi
+
+        if [[ "${words[CURRENT-1]}" == "--max-commits" ]]; then
+            return
+        fi
+
+        _arguments \
+            '--onto[Explicit rebase target]:target branch:_describe "upstream branch" branches' \
+            '--max-commits[Maximum commits to rebase]:count:' \
+            '--detect-only[Print detected target and exit]' \
+            '--no-fetch[Skip fetching upstream]' \
+            ':branch:_describe "local branch" local_branches'
+    }
+else
+    # Bash completion
+    _git_rebase_upstream() {
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+        local prev="${COMP_WORDS[COMP_CWORD-1]}"
+        local upstream_remote
+        upstream_remote=$(git fork get upstream.remote 2>/dev/null) || return
+
+        if [[ "$prev" == "--onto" ]]; then
+            local branches
+            branches=$(git branch -r --list "$upstream_remote/*" 2>/dev/null \
+                | sed "s|^ *$upstream_remote/||" \
+                | grep -v '^HEAD ')
+            COMPREPLY=($(compgen -W "$branches" -- "$cur"))
+            return
+        fi
+
+        if [[ "$prev" == "--max-commits" ]]; then
+            return
+        fi
+
+        if [[ "$cur" == --* ]]; then
+            COMPREPLY=($(compgen -W "--onto --detect-only --max-commits --no-fetch" -- "$cur"))
+            return
+        fi
+
+        local local_branches
+        local_branches=$(git branch --format='%(refname:short)' 2>/dev/null)
+        COMPREPLY=($(compgen -W "$local_branches" -- "$cur"))
+    }
+fi

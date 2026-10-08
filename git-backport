@@ -122,7 +122,7 @@ done
 
 UPSTREAM_REMOTE=$(git fork get upstream.remote)
 FORK_REMOTE=$(git fork get remote)
-INITIAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+INITIAL_BRANCH=$(git symbolic-ref --short HEAD)
 TARGET_BRANCHES=("$@")
 
 [ "$INITIAL_BRANCH" != "HEAD" ] \
@@ -146,9 +146,7 @@ if [ -n "$BASE" ]; then
 		|| abort "No commits to backport: '$INITIAL_BRANCH' has no commits beyond '$BASE'."
 	log "Found $COMMIT_COUNT commit(s) to backport."
 else
-	BASE_BRANCH=$(git fork closest-upstream-branch-name "$INITIAL_BRANCH" 2>/dev/null) \
-		|| true
-	[ -n "$BASE_BRANCH" ] \
+	BASE_BRANCH=$(git rebase-upstream --detect-only --no-fetch "$INITIAL_BRANCH") \
 		|| abort "Could not detect the upstream base branch of '$INITIAL_BRANCH'."
 	log "Detected base branch: '$BASE_BRANCH'"
 	BASE_REF="$UPSTREAM_REMOTE/$BASE_BRANCH"

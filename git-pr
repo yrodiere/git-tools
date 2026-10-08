@@ -47,7 +47,7 @@ function create_pr() {
 		UPSTREAM_HEAD_BRANCH="${JIRA_INFO[2]}"
 		if [ -z "$UPSTREAM_HEAD_BRANCH" ]
 		then
-			UPSTREAM_HEAD_BRANCH="$(git fork closest-upstream-branch-name $FORK_BRANCH 2>/dev/null || true)"
+			UPSTREAM_HEAD_BRANCH="$(git rebase-upstream --detect-only --no-fetch "$FORK_BRANCH" || true)"
 		fi
 		if [ -z "$UPSTREAM_HEAD_BRANCH" ]
 		then
