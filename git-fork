@@ -25,7 +25,7 @@ function usage() {
 	log -e "OR"
 	log -e "\tgit fork branch init"
 	log -e "OR"
-	log -e "\tgit fork closest-upstream-branch-name <revision>"
+	log -e "\tgit fork detect-base <revision>"
 	abort
 }
 
@@ -54,6 +54,60 @@ function autosetup() {
 
 function git_url_to_http() {
 	sed -r 's,^(git@([^:]+):|https://([^/]+)/?)(.*)\.git$,https://\2\3/\4,'
+}
+
+# Outputs tab-separated candidates for the base branch of a revision:
+#   name<TAB>commit_count<TAB>reason
+# Sorted by quality: suffix matches first (strong hint from branch naming
+# convention), then by commit count ascending, default branch before others
+# within ties, then by merge-base recency.
+function compute_base_candidates() {
+	local REVISION="$1"
+
+	local DEFAULT_BRANCH=""
+	DEFAULT_BRANCH=$(git rev-parse --abbrev-ref "$UPSTREAM_REMOTE/HEAD" 2>/dev/null \
+		| sed "s,^$UPSTREAM_REMOTE/,,") || true
+
+	local -a ALL_NAMES=()
+	while IFS= read -r refname; do
+		local name="${refname#refs/remotes/$UPSTREAM_REMOTE/}"
+		[ "$name" != "HEAD" ] || continue
+		ALL_NAMES+=("$name")
+	done < <(git for-each-ref --format='%(refname)' "refs/remotes/$UPSTREAM_REMOTE/")
+
+	(( ${#ALL_NAMES[@]} > 0 )) || return 0
+
+	local BRANCH_NAME
+	BRANCH_NAME=$(git rev-parse --abbrev-ref "$REVISION" 2>/dev/null || echo "$REVISION")
+
+	for name in "${ALL_NAMES[@]}"; do
+		local ref="$UPSTREAM_REMOTE/$name"
+		local mb bc ts
+
+		mb=$(git merge-base "$REVISION" "$ref" 2>/dev/null) || continue
+		bc=$(git rev-list --count "$mb..$REVISION")
+		(( bc > 0 )) || continue
+		ts=$(git log -1 --format='%ct' "$mb")
+
+		local sf=0
+		if [[ "$BRANCH_NAME" == *"-$name" ]] || [[ "$BRANCH_NAME" == *"/$name" ]]; then
+			sf=1
+		fi
+
+		local pri subpri reason
+		if (( sf == 1 )); then
+			pri=0; subpri=0; reason="suffix"
+		else
+			pri=1; reason="merge-base"
+			if [ "$name" = "$DEFAULT_BRANCH" ]; then
+				subpri=0
+			else
+				subpri=1
+			fi
+		fi
+
+		printf '%d\t%d\t%d\t%d\t%s\t%d\t%s\n' "$pri" "$bc" "$subpri" "$(( 0 - ts ))" "$name" "$bc" "$reason"
+	done | sort -t$'\t' -k1,1n -k2,2n -k3,3n -k4,4n | cut -f5-7
 }
 
 
@@ -154,37 +208,14 @@ then
 	else
 		usage
 	fi
-elif [ "$1" = 'closest-upstream-branch-name' ]
+elif [ "$1" = 'detect-base' ]
 then
 	shift
 	(( $# == 1 )) || usage
-	REVISION="$1"
-	shift
-	AWK_SCRIPT=$(cat <<END_SCRIPT
-{
-	# A single commit in the log can match multiple refs
-	# We need to pick one
-	split(\$0,refs,", ");
-	winner = ""
-	for (i in refs) {
-		ref = refs[i]
-		ref = gensub("^refs/remotes/$UPSTREAM_REMOTE/(.*)","\\\\1","g",ref)
-		ref = gensub("^refs/heads/(master|main|[[:digit:]]+.[[:digit:]]+)","\\\\1","g",ref)
-		# Only consider matching refs
-		# ref "main"/"master" always wins
-		if (ref != refs[i] && winner != "main" && winner != "master") {
-			winner = ref
-		}
-	}
-	print winner
-}
-END_SCRIPT
-)
-	git log "$REVISION" --format="%D" --decorate=full --decorate-refs='refs/remotes/'$UPSTREAM_REMOTE'/*' --decorate-refs='refs/heads/*' \
-		| grep -v '^$' \
-		| awk "$AWK_SCRIPT" \
-		| grep -v '^$' \
-		| head -n 1
+	RESULT=$(compute_base_candidates "$1")
+	[ -n "$RESULT" ] \
+		|| abort "No upstream branch on '$UPSTREAM_REMOTE' shares history with '$1'."
+	echo "$RESULT"
 	success
 else
 	usage

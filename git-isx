@@ -22,22 +22,6 @@ function get_git_directory_name() {
 	basename "$(git rev-parse --show-toplevel)"
 }
 
-function get_base_branch() {
-	local BRANCH_NAME="$1"
-
-	local BASE_BRANCH_NAME
-	BASE_BRANCH_NAME="$(git fork closest-upstream-branch-name "$BRANCH_NAME" 2>/dev/null || true)"
-	if [ -z "$BASE_BRANCH_NAME" ]
-	then
-		abort "Could not infer the base branch for '$BRANCH_NAME'. Make sure 'git fork' is set up and the branch is based on a known upstream branch."
-	fi
-
-	local UPSTREAM_REMOTE
-	UPSTREAM_REMOTE="$(git fork get upstream.remote)"
-
-	echo "$UPSTREAM_REMOTE/$BASE_BRANCH_NAME"
-}
-
 function run_on_isx_remote() {
 	local REMOTE_NAME="$1"
 	local BASH_CMD="$2"
@@ -141,27 +125,8 @@ function get_branch() {
 		git reset --hard "$REMOTE_NAME/$REMOTE_BRANCH" \
 			|| abort "Error resetting to '$REMOTE_NAME/$REMOTE_BRANCH'."
 
-		# Rebase on the inferred base branch
-		local BASE_BRANCH
-		BASE_BRANCH="$(get_base_branch "$BRANCH_NAME")"
-
-		# Fetch the base branch first
-		local BASE_REMOTE
-		BASE_REMOTE=$(echo "$BASE_BRANCH" | cut -d/ -f1)
-		local BASE_BRANCH_NAME
-		BASE_BRANCH_NAME=$(echo "$BASE_BRANCH" | cut -d/ -f2)
-		git fetch "$BASE_REMOTE" "$BASE_BRANCH_NAME" \
-			|| abort "Error fetching '$BASE_BRANCH'."
-
-		COMMIT_COUNT=$(git rev-list --count "$BASE_BRANCH..HEAD")
-		if [ "$COMMIT_COUNT" -gt 0 ]
-		then
-			log "Rebasing on '$BASE_BRANCH' ($COMMIT_COUNT commits)..."
-			git rebase "$BASE_BRANCH" \
-				|| abort "Error during rebase on '$BASE_BRANCH'. Please resolve conflicts and complete the rebase manually."
-		else
-			log "Already up to date with '$BASE_BRANCH', skipping rebase."
-		fi
+		git rebase-upstream \
+			|| abort "Error during rebase. Please resolve conflicts and complete the rebase manually."
 
 	else
 		# Branch doesn't exist - create from the remote's checked-out branch
@@ -171,28 +136,8 @@ function get_branch() {
 		git switch -c "$BRANCH_NAME" --no-track "$REMOTE_NAME/$REMOTE_BRANCH" \
 			|| abort "Error while creating branch '$BRANCH_NAME' from '$REMOTE_NAME/$REMOTE_BRANCH'."
 
-		# Rebase on the inferred base branch
-		local BASE_BRANCH
-		BASE_BRANCH="$(get_base_branch "$BRANCH_NAME")"
-
-		# Fetch the base branch first
-		local BASE_REMOTE
-		BASE_REMOTE=$(echo "$BASE_BRANCH" | cut -d/ -f1)
-		local BASE_BRANCH_NAME
-		BASE_BRANCH_NAME=$(echo "$BASE_BRANCH" | cut -d/ -f2)
-		git fetch "$BASE_REMOTE" "$BASE_BRANCH_NAME" \
-			|| abort "Error fetching '$BASE_BRANCH'."
-
-		local COMMIT_COUNT
-		COMMIT_COUNT=$(git rev-list --count "$BASE_BRANCH..HEAD")
-		if [ "$COMMIT_COUNT" -gt 0 ]
-		then
-			log "Rebasing on '$BASE_BRANCH' ($COMMIT_COUNT commits)..."
-			git rebase "$BASE_BRANCH" \
-				|| abort "Error during rebase on '$BASE_BRANCH'. Please resolve conflicts and complete the rebase manually."
-		else
-			log "Already up to date with '$BASE_BRANCH', skipping rebase."
-		fi
+		git rebase-upstream \
+			|| abort "Error during rebase. Please resolve conflicts and complete the rebase manually."
 	fi
 
 	# Push the result back to the source remote if there are changes

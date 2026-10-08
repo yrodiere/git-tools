@@ -1,0 +1,203 @@
+#!/bin/bash
+# Smart rebase: automatically detect the best upstream branch
+# to rebase on and perform the rebase with safeguards.
+#
+# Detection is delegated to 'git fork detect-base', which uses
+# branch name suffix convention as a strong primary signal and
+# merge-base analysis as a fallback. Prompts interactively when
+# multiple candidates are tied.
+
+source $(readlink -f ${BASH_SOURCE[0]} | xargs dirname)/lib/common.sh
+
+function usage() {
+	log 'Usage:'
+	log -e '\tgit rebase-upstream [options] [<branch>]'
+	log ''
+	log 'Rebases <branch> (default: current branch) onto the best upstream'
+	log 'branch target, detected via merge-base analysis and naming conventions.'
+	log ''
+	log 'Options:'
+	log -e '\t--onto <target>       Explicit rebase target (skips auto-detection)'
+	log -e '\t--detect-only         Print the detected target branch name and exit'
+	log -e '\t--max-commits <n>     Abort if more than <n> commits would be rebased'
+	log -e '\t                      (default: 50, 0 = no limit)'
+	log -e '\t--no-fetch            Skip fetching the upstream remote'
+	abort
+}
+
+# --- Option parsing ---
+
+MAX_COMMITS=50
+EXPLICIT_TARGET=""
+DO_FETCH=true
+DETECT_ONLY=false
+BRANCH=""
+
+while (( $# > 0 )); do
+	case "$1" in
+		--onto)
+			[ -n "${2:-}" ] || usage
+			EXPLICIT_TARGET="$2"
+			shift 2
+			;;
+		--detect-only)
+			DETECT_ONLY=true
+			shift
+			;;
+		--max-commits)
+			[ -n "${2:-}" ] || usage
+			MAX_COMMITS="$2"
+			shift 2
+			;;
+		--no-fetch)
+			DO_FETCH=false
+			shift
+			;;
+		--help|-h)
+			usage
+			;;
+		-*)
+			log "Unknown option: $1"
+			usage
+			;;
+		*)
+			[ -z "$BRANCH" ] || usage
+			BRANCH="$1"
+			shift
+			;;
+	esac
+done
+
+# --- Setup ---
+
+CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "HEAD")
+if [ -z "$BRANCH" ]; then
+	BRANCH="$CURRENT_BRANCH"
+fi
+
+[ "$BRANCH" != "HEAD" ] \
+	|| abort "Cannot rebase a detached HEAD. Specify a branch name."
+
+git rev-parse --verify "refs/heads/$BRANCH" >/dev/null 2>&1 \
+	|| abort "Branch '$BRANCH' does not exist."
+
+BRANCH_REF="refs/heads/$BRANCH"
+
+UPSTREAM_REMOTE=$(git fork get upstream.remote) \
+	|| abort "Could not determine upstream remote. Run 'git fork setup <upstream> <fork>' first."
+
+if $DO_FETCH; then
+	log "Fetching '$UPSTREAM_REMOTE'..."
+	git fetch -p "$UPSTREAM_REMOTE"
+fi
+
+# --- Target detection ---
+
+if [ -n "$EXPLICIT_TARGET" ]; then
+	if [[ "$EXPLICIT_TARGET" == */* ]]; then
+		git rev-parse --verify "$EXPLICIT_TARGET^{commit}" >/dev/null 2>&1 \
+			|| abort "Target '$EXPLICIT_TARGET' does not resolve to a valid commit."
+		TARGET="$EXPLICIT_TARGET"
+	else
+		if git rev-parse --verify "$UPSTREAM_REMOTE/$EXPLICIT_TARGET^{commit}" >/dev/null 2>&1; then
+			TARGET="$UPSTREAM_REMOTE/$EXPLICIT_TARGET"
+		elif git rev-parse --verify "$EXPLICIT_TARGET^{commit}" >/dev/null 2>&1; then
+			TARGET="$EXPLICIT_TARGET"
+		else
+			abort "Target '$EXPLICIT_TARGET' does not exist (tried '$EXPLICIT_TARGET' and '$UPSTREAM_REMOTE/$EXPLICIT_TARGET')."
+		fi
+	fi
+	log "Using explicit target: '$TARGET'."
+else
+	CANDIDATES=$(git fork detect-base "$BRANCH_REF") \
+		|| abort "Could not detect base branch for '$BRANCH'."
+
+	[ -n "$CANDIDATES" ] \
+		|| abort "No upstream branch on '$UPSTREAM_REMOTE' shares history with '$BRANCH'."
+
+	BEST_NAME=$(echo "$CANDIDATES" | head -1 | cut -f1)
+	BEST_BC=$(echo "$CANDIDATES" | head -1 | cut -f2)
+	BEST_REASON=$(echo "$CANDIDATES" | head -1 | cut -f3)
+
+	TARGET="$UPSTREAM_REMOTE/$BEST_NAME"
+
+	if [ "$BEST_REASON" = "suffix" ]; then
+		log "Detected target (branch name match): '$TARGET' ($BEST_BC commit(s) to rebase)."
+	else
+		# Check for ties: multiple candidates with the same commit count
+		TIED_NAMES=()
+		while IFS=$'\t' read -r name bc reason; do
+			[ "$bc" = "$BEST_BC" ] && [ "$reason" = "merge-base" ] && TIED_NAMES+=("$name")
+		done <<< "$CANDIDATES"
+
+		if (( ${#TIED_NAMES[@]} > 1 )); then
+			if [ -t 0 ]; then
+				log ""
+				log "Multiple candidate targets with $BEST_BC commit(s) to rebase:"
+
+				PS3="Select target: "
+				select choice in "${TIED_NAMES[@]}"; do
+					if [ -n "$choice" ]; then
+						TARGET="$UPSTREAM_REMOTE/$choice"
+						log "Selected: '$TARGET'."
+						break
+					fi
+				done
+				[ -n "${choice:-}" ] || abort "No target selected."
+			else
+				log "Detected target (best guess): '$TARGET' ($BEST_BC commit(s) to rebase)."
+			fi
+		else
+			log "Detected target: '$TARGET' ($BEST_BC commit(s) to rebase)."
+		fi
+	fi
+fi
+
+# --- Safeguards ---
+
+MERGE_BASE=$(git merge-base "$BRANCH_REF" "$TARGET") \
+	|| abort "Cannot find merge-base between '$BRANCH' and '$TARGET'."
+COMMIT_COUNT=$(git rev-list --count "$MERGE_BASE..$BRANCH_REF")
+
+if (( MAX_COMMITS > 0 && COMMIT_COUNT > MAX_COMMITS )); then
+	log "Would apply $COMMIT_COUNT commit(s) onto '$TARGET'."
+	log "This exceeds the safety limit of $MAX_COMMITS and likely indicates a wrong target."
+	log ""
+	log "To specify a different target:"
+	log -e "\tgit rebase-upstream --onto <branch>"
+	log ""
+	log "To proceed anyway:"
+	log -e "\tgit rebase-upstream --max-commits 0"
+	abort
+fi
+
+# --- Detect-only mode: output and exit ---
+
+if $DETECT_ONLY; then
+	echo "${TARGET#$UPSTREAM_REMOTE/}"
+	exit 0
+fi
+
+# --- Rebase ---
+
+if git merge-base --is-ancestor "$TARGET" "$BRANCH_REF"; then
+	AHEAD_COUNT=$(git rev-list --count "$TARGET..$BRANCH_REF")
+	log "'$BRANCH' is already based on '$TARGET' ($AHEAD_COUNT commit(s) ahead). Nothing to rebase."
+	success
+fi
+
+if [ "$BRANCH" != "$CURRENT_BRANCH" ]; then
+	log "Switching to '$BRANCH'..."
+fi
+
+log "Rebasing '$BRANCH' onto '$TARGET' ($COMMIT_COUNT commit(s))..."
+
+if [ "$BRANCH" = "$CURRENT_BRANCH" ]; then
+	git rebase "$TARGET" \
+		|| abort "Rebase failed. Resolve conflicts and run 'git rebase --continue', or 'git rebase --abort' to cancel."
+else
+	git rebase "$TARGET" "$BRANCH_REF" \
+		|| abort "Rebase failed. Resolve conflicts and run 'git rebase --continue', or 'git rebase --abort' to cancel."
+fi
+
+success "Successfully rebased '$BRANCH' onto '$TARGET'."
