@@ -36,8 +36,13 @@ function run_on_isx_remote() {
 		# Mirror GitRemoteUtils.expandContainerTilde: ~/... -> /home/agentuser/...
 		REPO_PATH="${REPO_PATH/#~//home/agentuser}"
 	else
-		# The URL separator '/' also serves as the leading '/' of an absolute path,
-		# following the same convention as git's ssh:// URLs.
+		# Backward-compat for old ambiguous single-slash URLs that incus-spawn
+		# used to generate for host-source repos (e.g. isx://inst/home/agentuser/repo
+		# meaning absolute path /home/agentuser/repo, but indistinguishable in form
+		# from a relative path). Prepend '/' so these still resolve correctly.
+		# New incus-spawn versions generate an unambiguous double-slash form for
+		# absolute paths (isx://inst//home/agentuser/repo), which already works
+		# without this fixup since the second '/' survives the ${ISX_PART#*/} strip.
 		REPO_PATH="/$REPO_PATH"
 	fi
 
