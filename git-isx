@@ -32,8 +32,14 @@ function run_on_isx_remote() {
 	local ISX_PART="${REMOTE_URL#isx://}"
 	local INSTANCE="${ISX_PART%%/*}"
 	local REPO_PATH="${ISX_PART#*/}"
-	# Mirror GitRemoteUtils.expandContainerTilde: ~/... -> /home/agentuser/...
-	REPO_PATH="${REPO_PATH/#~//home/agentuser}"
+	if [[ "$REPO_PATH" == ~* ]]; then
+		# Mirror GitRemoteUtils.expandContainerTilde: ~/... -> /home/agentuser/...
+		REPO_PATH="${REPO_PATH/#~//home/agentuser}"
+	else
+		# The URL separator '/' also serves as the leading '/' of an absolute path,
+		# following the same convention as git's ssh:// URLs.
+		REPO_PATH="/$REPO_PATH"
+	fi
 
 	incus exec "$INSTANCE" --user 1000 --cwd "/home/agentuser" -- bash -c "cd $REPO_PATH && $BASH_CMD"
 }
