@@ -40,9 +40,10 @@ function run_on_isx_remote() {
 		# used to generate for host-source repos (e.g. isx://inst/home/agentuser/repo
 		# meaning absolute path /home/agentuser/repo, but indistinguishable in form
 		# from a relative path). Prepend '/' so these still resolve correctly.
-		# New incus-spawn versions generate an unambiguous double-slash form for
-		# absolute paths (isx://inst//home/agentuser/repo), which already works
-		# without this fixup since the second '/' survives the ${ISX_PART#*/} strip.
+		# New incus-spawn versions (https://github.com/Sanne/incus-spawn/pull/1704)
+		# generate an unambiguous double-slash form for absolute paths
+		# (isx://inst//home/agentuser/repo), which already works without this
+		# fixup since the second '/' survives the ${ISX_PART#*/} strip.
 		REPO_PATH="/$REPO_PATH"
 	fi
 
